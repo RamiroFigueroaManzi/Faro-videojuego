@@ -11,14 +11,8 @@ const blockRect = (i, j) => ({ x: i * CFG.CELL + CFG.R, y: j * CFG.CELL + CFG.R,
 
 const STREETS = ['Av. Colón', 'San Martín', 'Belgrano', 'Rivadavia', 'Sarmiento', 'Mitre', 'Av. Libertador', 'Urquiza', 'Moreno', 'Alsina', 'Lavalle', 'Brown'];
 const INCIDENTS = ['INCENDIO ESTRUCTURAL', 'INCENDIO EN DEPÓSITO', 'INCENDIO EN VIVIENDA', 'INCENDIO EN TALLER'];
-// Zonas fijas: mismo mapa para todos → récords comparables y fantasma.
-const MAPS = [
-  { seed: 1107, name: 'CENTRO' },
-  { seed: 2291, name: 'PUERTO' },
-  { seed: 3517, name: 'BARRIO NORTE' },
-  { seed: 4783, name: 'PARQUE SUR' },
-  { seed: 5903, name: 'VILLA CRESPO' },
-];
+// Mapa único y fijo: el mismo para todos → récords comparables y fantasma.
+const MAP_SEED = 1107;
 const SPREAD_AT = [10, 18];
 
 const ROOF_SHADES = ['#12161D', '#151A22', '#0F1319', '#171B21', '#11151B'];

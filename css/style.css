@@ -328,6 +328,11 @@ body.kb .pad-only { display: none; }
 .board li .sc { text-align: right; color: var(--mist); }
 .board li:first-child .nm, .board li:first-child .sc { color: var(--beam-a); }
 .board li.empty { opacity: 0.3; }
+#res-board { max-height: 300px; overflow-y: auto; padding-right: 4px; position: relative; }
+#res-board::-webkit-scrollbar { width: 8px; }
+#res-board::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+#res-board::-webkit-scrollbar-thumb:hover { background: var(--ash); }
+.board li { grid-template-columns: 38px 1fr 30px 80px; }
 .board li.hi { background: rgba(242, 112, 60, 0.18); border: 1px solid rgba(242, 112, 60, 0.6); animation: blink 1s 3; }
 
 /* Resultado en dos columnas */

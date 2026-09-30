@@ -17,14 +17,10 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin storage */ } },
   };
 
-  let mapIdx = U.clamp(store.get('faro-map', 0), 0, MAPS.length - 1);
-  const dbgMap = new URLSearchParams(location.search).get('mapa');
-  if (dbgMap) mapIdx = U.clamp(+dbgMap - 1, 0, MAPS.length - 1);
-  const map = () => MAPS[mapIdx];
-  const boardKey = () => 'faro-board-' + map().seed;
-  const ghostKey = () => 'faro-ghost-' + map().seed;
+  const boardKey = () => 'faro-board-' + MAP_SEED;
+  const ghostKey = () => 'faro-ghost-' + MAP_SEED;
 
-  let world = genWorld(map().seed);
+  let world = genWorld(MAP_SEED);
   let G = null;
   let state = 'title';
   let stateT = 0;
@@ -55,24 +51,15 @@
   function toTitle() {
     paused = false; show('screen-pause', false);
     G = null; FX.clear();
-    world = genWorld(map().seed);
+    world = genWorld(MAP_SEED);
     setState('title');
-    renderTitle();
-  }
-
-  function changeMap(d) {
-    mapIdx = (mapIdx + d + MAPS.length) % MAPS.length;
-    store.set('faro-map', mapIdx);
-    world = genWorld(map().seed);
-    FX.clear();
-    Sfx.ui();
     renderTitle();
   }
 
   function startRun() {
     Sfx.init();
     Sfx.ui();
-    world = genWorld(map().seed);
+    world = genWorld(MAP_SEED);
     world.skids = [];
     FX.clear();
     const s = world.start;
@@ -90,11 +77,11 @@
     cam.x = s.x; cam.y = s.y; cam.zoom = 1.35;
     lastCount = -1;
     $('brief-type').textContent = world.incident.type;
-    $('brief-addr').textContent = `${world.incident.street} · ZONA ${map().name}`;
+    $('brief-addr').textContent = world.incident.street;
     $('brief-radio').textContent = '';
     $('countdown').textContent = '';
     const top = store.get(boardKey(), [])[0];
-    $('brief-rec').textContent = top ? `RÉCORD DE LA ZONA · ${top.n} · ${top.s.toLocaleString('es-AR')}` : 'SIN RÉCORD EN ESTA ZONA · ¡SÉ EL PRIMERO!';
+    $('brief-rec').textContent = top ? `RÉCORD · ${top.n} · ${top.s.toLocaleString('es-AR')}` : 'TODAVÍA NO HAY RÉCORD · ¡SÉ EL PRIMERO!';
     buildCivIcons();
     setState('brief');
   }
@@ -612,7 +599,7 @@
     badge.className = 'badge ' + (win ? 'resolved' : 'critical');
     $('res-title').textContent = win ? 'INCENDIO CONTROLADO' : 'LLEGASTE TARDE';
     $('res-sub').textContent = win
-      ? `${world.incident.type} · ZONA ${map().name}`
+      ? `${world.incident.type} · ${world.incident.street}`
       : 'El fuego se propagó. Cada segundo cuenta.';
     const rank = $('res-rank');
     rank.textContent = G.rank;
@@ -626,20 +613,18 @@
     $('res-score').textContent = G.score.toLocaleString('es-AR');
 
     const board = store.get(boardKey(), []);
-    const qualifies = G.score > 0 && (board.length < 10 || G.score > board[board.length - 1].s);
-    if (qualifies) {
-      const last = store.get('faro-name', 'AAA').padEnd(3, 'A').slice(0, 3);
-      G.ini = { letters: last.split(''), idx: 0 };
-      G.post = 'initials';
-      renderIni();
-    } else {
-      G.post = 'board';
-    }
+    // Todos los que juegan entran al ranking (sin límite de participantes).
+    const last = store.get('faro-name', 'AAA').padEnd(3, 'A').slice(0, 3);
+    G.ini = { letters: last.split(''), idx: 0 };
+    G.post = 'initials';
+    renderIni();
+    const pos = board.filter((e) => e.s > G.score).length + 1;
     renderBoard($('res-board'), board, -1);
-    $('res-board-map').textContent = map().name;
-    show('ini', G.post === 'initials');
-    show('res-cta', G.post === 'board');
-    $('res-best').textContent = qualifies ? '★ ENTRASTE AL TOP 10' : '';
+    $('res-board-count').textContent = board.length;
+    $('ini-pos').textContent = `Puesto #${pos} de ${board.length + 1}`;
+    show('ini', true);
+    show('res-cta', false);
+    $('res-best').textContent = '';
     setState('result');
   }
 
@@ -675,15 +660,15 @@
     const entry = { n: name, s: G.score, r: G.rank, t: Date.now() };
     board.push(entry);
     board.sort((a, b) => b.s - a.s);
-    const top = board.slice(0, 10);
-    store.set(boardKey(), top);
+    store.set(boardKey(), board);
     if (G.newGhost) { G.newGhost.name = name; store.set(ghostKey(), G.newGhost); }
-    G.entryIdx = top.indexOf(entry);
+    G.entryIdx = board.indexOf(entry);
     G.post = 'board';
-    renderBoard($('res-board'), top, G.entryIdx);
+    renderBoard($('res-board'), board, G.entryIdx);
+    $('res-board-count').textContent = board.length;
     show('ini', false);
     show('res-cta', true);
-    $('res-best').textContent = G.entryIdx === 0 ? '★ ¡NUEVO RÉCORD DE LA ZONA!' : `★ PUESTO #${G.entryIdx + 1}`;
+    $('res-best').textContent = G.entryIdx === 0 ? '★ ¡NUEVO RÉCORD!' : `★ PUESTO #${G.entryIdx + 1} DE ${board.length}`;
     Sfx.win();
     Input.rumble(0.4, 0.8, 300);
   }
@@ -697,9 +682,11 @@
     }
   }
 
-  function renderBoard(el, board, hi) {
+  // min: filas vacías de relleno cuando todavía hay pocos participantes.
+  function renderBoard(el, board, hi, min = 5) {
     el.innerHTML = '';
-    for (let i = 0; i < 10; i++) {
+    let hiEl = null;
+    for (let i = 0; i < Math.max(min, board.length); i++) {
       const e = board[i];
       const li = document.createElement('li');
       li.className = (i === hi ? 'hi' : '') + (e ? '' : ' empty');
@@ -707,17 +694,18 @@
         ? `<span class="pos">${i + 1}</span><span class="nm">${e.n}</span><span class="rk rank-${e.r}">${e.r}</span><span class="sc">${e.s.toLocaleString('es-AR')}</span>`
         : `<span class="pos">${i + 1}</span><span class="nm">---</span><span class="rk"></span><span class="sc">—</span>`;
       el.appendChild(li);
+      if (i === hi) hiEl = li;
     }
+    if (hiEl) el.scrollTop = hiEl.offsetTop - el.clientHeight / 2 + hiEl.offsetHeight / 2;
+    else el.scrollTop = 0;
   }
 
   function renderTitle() {
-    $('map-name').textContent = map().name;
-    $('map-idx').textContent = `${mapIdx + 1}/${MAPS.length}`;
     const board = store.get(boardKey(), []);
     renderBoard($('title-board-list'), board.slice(0, 5), -1);
-    $('title-board-map').textContent = map().name;
+    $('title-board-count').textContent = board.length;
     const top = board[0];
-    $('title-best').textContent = top ? `RÉCORD · ${top.n} · ${top.s.toLocaleString('es-AR')}` : 'ZONA SIN RÉCORD';
+    $('title-best').textContent = top ? `RÉCORD · ${top.n} · ${top.s.toLocaleString('es-AR')}` : 'TODAVÍA NO HAY RÉCORD';
   }
 
   // ------------------------------------------------------------- mundo
@@ -836,7 +824,6 @@
     switch (state) {
       case 'title':
         updateWorld(dt);
-        if (Input.nav.x) changeMap(Input.nav.x);
         if (Input.pressed(BTN.CROSS)) startRun();
         break;
 

@@ -94,14 +94,6 @@
       <div class="subtitle">RESPUESTA<span class="accent-bar"></span></div>
       <p class="tagline">30 segundos. Un incendio que crece. Cargá agua, rescatá a quien puedas y pasá rozando para cargar el turbo.</p>
 
-      <div class="map-sel">
-        <span class="arrow">◂</span>
-        <span class="map-label">ZONA</span>
-        <b id="map-name">CENTRO</b>
-        <span id="map-idx" class="mono dim">1/5</span>
-        <span class="arrow">▸</span>
-      </div>
-
       <div class="cta"><span data-glyph="0"></span><span>PRESIONÁ PARA DESPACHAR</span><span class="kb-only mono">(ESPACIO)</span></div>
 
       <div id="title-panels" class="title-panels">
@@ -114,7 +106,7 @@
           <div class="ctl kb"><span class="k mono">TECLADO</span><span>WASD · Shift turbo · Espacio · J K L I · mouse para apuntar</span></div>
         </div>
         <div class="title-board glass">
-          <div class="board-title">TOP 5 · ZONA <span id="title-board-map"></span></div>
+          <div class="board-title">TOP 5 · <span id="title-board-count">0</span> PARTICIPANTES</div>
           <ol id="title-board-list" class="board"></ol>
         </div>
       </div>
@@ -169,12 +161,12 @@
         </div>
         <div class="res-right">
           <div id="ini" class="ini hidden">
-            <div class="ini-title">¡ENTRASTE AL TOP 10!</div>
-            <div class="ini-sub">Ingresá tus iniciales</div>
+            <div class="ini-title">¡ANOTATE EN EL RANKING!</div>
+            <div class="ini-sub"><span id="ini-pos"></span> · Ingresá tus iniciales</div>
             <div class="ini-slots"><span id="ini0" class="slot">A</span><span id="ini1" class="slot">A</span><span id="ini2" class="slot">A</span></div>
             <div class="ini-help mono"><span class="pad-only">▲▼ letra · ◀▶ mover · ✕ siguiente</span><span class="kb-only">Escribí tus letras · Enter confirmar</span></div>
           </div>
-          <div class="board-title">TOP 10 · ZONA <span id="res-board-map"></span></div>
+          <div class="board-title">RANKING · <span id="res-board-count">0</span> PARTICIPANTES</div>
           <ol id="res-board" class="board"></ol>
         </div>
       </div>
