@@ -23,6 +23,7 @@ function genWorld(seed) {
   const w = {
     W, H, blocks: [], solids: [], circles: [], oils: [], hydrants: [], civilians: [], cars: [],
     lamps: [], fires: [], trees: [], rubble: [], wrecks: [], cones: [], fountains: [], segs: [],
+    collapses: [], trapped: null,
   };
 
   // Estación (abajo a la izquierda) e incidente (lejos, arriba a la derecha)
@@ -126,6 +127,37 @@ function genWorld(seed) {
     taken.push({ x: p.x, y: p.y, r: 70 });
   }
 
+  // Eventos: calles que se derrumban al acercarte (cortan el tramo entero)
+  const blockAt = (i, j) => w.blocks.find((b) => b.i === i && b.j === j);
+  for (const sg of U.shuffle(w.segs.slice())) {
+    if (w.collapses.length >= 2) break;
+    const mid = pt(sg, 0.5, 0);
+    if (U.dist(mid.x, mid.y, w.start.x, w.start.y) < 700 || !free(mid, 150)) continue;
+    if (w.collapses.some((c) => U.dist(c.x, c.y, mid.x, mid.y) < 800)) continue;
+    const k = Math.round((sg.a - R) / CELL), line = Math.round((sg.c - R / 2) / CELL);
+    const sides = sg.h ? [blockAt(k, line - 1), blockAt(k, line)] : [blockAt(line - 1, k), blockAt(line, k)];
+    const b = U.shuffle(sides.filter((x) => x && x.type === 'building'))[0];
+    if (!b) continue;
+    const rect = sg.h
+      ? { x: mid.x - 46, y: sg.c - R / 2, w: 92, h: R, kind: 'collapse' }
+      : { x: sg.c - R / 2, y: mid.y - 46, w: R, h: 92, kind: 'collapse' };
+    const dir = sg.h ? { x: 0, y: Math.sign(sg.c - (b.y + b.h / 2)) } : { x: Math.sign(sg.c - (b.x + b.w / 2)), y: 0 };
+    const chunks = [];
+    for (let n = 0; n < 14; n++) chunks.push([U.rand(0, 1), U.rand(0, 1), U.rand(8, 20), U.r() * 6]);
+    w.collapses.push({ x: mid.x, y: mid.y, h: !!sg.h, rect, dir, chunks, street: U.pick(STREETS), state: 'idle', t: 0 });
+    taken.push({ x: mid.x, y: mid.y, r: 170 });
+  }
+
+  // Evento: civil atrapado que pide ayuda a mitad de camino
+  for (const sg of U.shuffle(w.segs.slice())) {
+    const p = pt(sg, U.rand(0.3, 0.7), U.pick([-1, 1]) * 66);
+    const ds = U.dist(p.x, p.y, w.start.x, w.start.y);
+    if (ds < 700 || ds > 1700 || U.dist(p.x, p.y, w.arrival.x, w.arrival.y) < 500 || !free(p, 90)) continue;
+    w.trapped = { x: p.x, y: p.y, street: U.pick(STREETS), state: 'idle', t: 0, ph: U.r() * 6 };
+    taken.push({ x: p.x, y: p.y, r: 90 });
+    break;
+  }
+
   // Obstáculos: uno por tramo, bloqueando un carril
   for (const s of U.shuffle(w.segs.slice())) {
     if (U.r() < 0.3) continue;
@@ -159,6 +191,9 @@ function genWorld(seed) {
       w.oils.push({ x: p.x, y: p.y, r: 50, rot: U.r() * 3 });
     }
   }
+
+  // Algunos autos incendiados son inestables: explotan cuando te acercás
+  U.shuffle(w.wrecks.filter((b) => b.burning)).slice(0, 3).forEach((b) => { b.unstable = true; });
 
   // Tránsito civil
   for (let tries = 0; w.cars.length < 5 && tries < 60; tries++) {

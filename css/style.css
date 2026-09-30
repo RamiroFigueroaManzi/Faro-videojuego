@@ -366,3 +366,5 @@ body.kb .pad-only { display: none; }
   .res-right { border: none; padding: 0; }
   .combo-x { font-size: 52px; }
 }
+.civ-icon.special svg { stroke: rgba(239, 232, 220, 0.25); stroke-dasharray: 3 2; }
+.civ-icon.special.on svg { stroke: #FFFFFF; stroke-dasharray: none; filter: drop-shadow(0 0 8px #FFFFFF); }

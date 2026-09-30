@@ -398,6 +398,73 @@ const Render = (() => {
     ctx.restore();
   }
 
+  function drawEvents(w, T, vis) {
+    for (const c of w.collapses) {
+      const r = c.rect;
+      if (!vis(r.x + r.w / 2, r.y + r.h / 2, 150)) continue;
+      if (c.state === 'warn') {
+        // grietas que avanzan sobre la calle
+        const k = 1 - c.t / 1.2;
+        ctx.strokeStyle = 'rgba(220,38,38,' + (0.35 + 0.35 * Math.sin(T * 20)) + ')';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+          const sx = r.x + r.w * (0.2 + 0.2 * i), sy = r.y + r.h * (0.2 + 0.2 * ((i * 3) % 4));
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + Math.sin(i * 2.3) * 60 * k, sy + Math.cos(i * 1.7) * 60 * k);
+        }
+        ctx.stroke();
+      }
+      if (c.state !== 'done') continue;
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(r.x + 6, r.y + 8, r.w, r.h);
+      ctx.fillStyle = '#23272E';
+      rr(ctx, r.x - 6, r.y - 6, r.w + 12, r.h + 12, 18); ctx.fill();
+      for (const [u, v, sz, rot] of c.chunks) {
+        ctx.save();
+        ctx.translate(r.x + u * r.w, r.y + v * r.h); ctx.rotate(rot);
+        ctx.fillStyle = sz > 14 ? '#2E333B' : '#1B1F25';
+        ctx.fillRect(-sz / 2, -sz / 2, sz, sz * 0.7);
+        ctx.strokeStyle = '#3A342B'; ctx.lineWidth = 1.5; ctx.strokeRect(-sz / 2, -sz / 2, sz, sz * 0.7);
+        ctx.restore();
+      }
+      // cinta de peligro
+      ctx.strokeStyle = 'rgba(245,158,11,0.7)'; ctx.lineWidth = 4; ctx.setLineDash([12, 10]);
+      ctx.strokeRect(r.x - 10, r.y - 10, r.w + 20, r.h + 20); ctx.setLineDash([]);
+    }
+
+    for (const b of w.wrecks) {
+      if (!b.unstable || b.exploded) continue;
+      const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+      if (!vis(cx, cy, 80)) continue;
+      const armed = b.armed;
+      const a = armed ? 0.6 + 0.4 * Math.sin(T * 40) : 0.45 + 0.2 * Math.sin(T * 4);
+      ctx.save();
+      ctx.translate(cx, cy - 42);
+      ctx.fillStyle = armed ? 'rgba(255,60,56,' + a + ')' : 'rgba(245,158,11,' + a + ')';
+      ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(12, 9); ctx.lineTo(-12, 9); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#05070A'; ctx.fillRect(-1.5, -5, 3, 8); ctx.fillRect(-1.5, 5, 3, 2.5);
+      ctx.restore();
+      if (armed) {
+        ctx.strokeStyle = 'rgba(255,60,56,' + (0.5 + 0.5 * Math.sin(T * 40)) + ')'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(cx, cy, 60 + (0.75 - b.fuse) * 120, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+
+    const tr = w.trapped;
+    if (tr && tr.state === 'active' && vis(tr.x, tr.y, 80)) {
+      drawCivilian(tr, T);
+      const k = Math.max(0, tr.t / 9);
+      ctx.strokeStyle = 'rgba(35,42,53,0.9)'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(tr.x, tr.y, 34, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = k > 0.35 ? '#EFE8DC' : '#FF3C38'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(tr.x, tr.y, 34, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke();
+      ctx.lineCap = 'butt';
+      ctx.font = '700 15px Oswald'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#EFE8DC'; ctx.fillText('¡AYUDA! ' + Math.ceil(tr.t) + 's', tr.x, tr.y - 50);
+    }
+  }
+
   function drawCars(w, vis) {
     for (const c of w.cars) {
       if (!vis(c.x, c.y, 50)) continue;
@@ -475,6 +542,8 @@ const Render = (() => {
     if (fire > 0.02) punch(w.incident.cx, w.incident.cy, 620 * (0.94 + 0.06 * Math.sin(T * 9)) * Math.min(1.3, 0.4 + 0.6 * fire), 0.95);
     if (G && G.tank < 1) for (const h of w.hydrants) punch(h.zx, h.zy, 130, 0.5);
     for (const c of w.civilians) if (!c.picked) punch(c.x, c.y, 80, 0.45);
+    if (w.trapped && w.trapped.state === 'active') punch(w.trapped.x, w.trapped.y, 150, 0.7);
+    for (const b of w.wrecks) if (b.armed) punch(b.x + b.w / 2, b.y + b.h / 2, 220, 0.6);
     for (const c of w.cars) {
       punch(c.x, c.y, 70, 0.35);
       wedge(c.x + c.fx * 28, c.y + c.fy * 28, Math.atan2(c.fy, c.fx), 190, 0.35, 0.6, vis);
@@ -517,6 +586,8 @@ const Render = (() => {
     }
     if (G && G.tank < 1) for (const h of w.hydrants) glow('59,130,246', h.zx, h.zy, 110, 0.28 + 0.08 * Math.sin(T * 4));
     for (const c of w.civilians) if (!c.picked) glow('243,245,247', c.x, c.y - 4, 46, 0.22 + 0.08 * Math.sin(T * 5 + c.ph));
+    if (w.trapped && w.trapped.state === 'active') glow('243,245,247', w.trapped.x, w.trapped.y, 110, 0.25 + 0.15 * Math.sin(T * 8));
+    for (const b of w.wrecks) if (b.armed) glow('255,60,56', b.x + b.w / 2, b.y + b.h / 2, 200, 0.3 + 0.25 * Math.sin(T * 40));
     glow('242,169,62', w.garage.x, w.garage.y + 10, 150, 0.28);
     if (active) {
       const fx = Math.cos(t.a), fy = Math.sin(t.a);
@@ -688,6 +759,7 @@ const Render = (() => {
     drawSkids(w, vis);
     drawZones(w, G, T);
     drawObjects(w, G, T, vis);
+    drawEvents(w, T, vis);
     drawCars(w, vis);
     drawGhost(G, T);
     drawTruck(truck, T, active);
@@ -709,6 +781,10 @@ const Render = (() => {
     if (state === 'play') {
       const tg = target(w, G);
       if (tg) drawMarker(tg, T, s, ox, oy);
+      const tr = w.trapped;
+      if (tr && tr.state === 'active') {
+        drawMarker({ x: tr.x, y: tr.y, label: 'CIVIL ATRAPADO', color: '#EFE8DC', d: U.dist(tr.x, tr.y, G.truck.x, G.truck.y) }, T, s, ox, oy);
+      }
     }
   }
 
@@ -746,6 +822,12 @@ const Render = (() => {
     const dot = (x, y, r, c) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r / k, 0, Math.PI * 2); g.fill(); };
     for (const c of w.cars) dot(c.x, c.y, 1.6, '#4A5462');
     for (const c of w.civilians) if (!c.picked) dot(c.x, c.y, 2.2, '#EFE8DC');
+    if (w.trapped && w.trapped.state === 'active') dot(w.trapped.x, w.trapped.y, 3 + 1.5 * Math.sin(T * 10), '#FFFFFF');
+    for (const c of w.collapses) {
+      if (c.state !== 'done') continue;
+      g.fillStyle = '#F59E0B';
+      g.fillRect(c.rect.x, c.rect.y, c.rect.w, c.rect.h);
+    }
     if (G && G.tank < 1) for (const h of w.hydrants) dot(h.zx, h.zy, 3 + Math.sin(T * 5), '#5887FF');
     const p = 1 + 0.35 * Math.sin(T * 6);
     dot(w.incident.cx, w.incident.cy, 6 * p, 'rgba(220,38,38,0.45)');

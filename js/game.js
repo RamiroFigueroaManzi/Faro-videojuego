@@ -17,8 +17,8 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin storage */ } },
   };
 
-  const boardKey = () => 'faro-board-' + MAP_SEED;
-  const ghostKey = () => 'faro-ghost-' + MAP_SEED;
+  const boardKey = () => 'faro-v2-board-' + MAP_SEED;
+  const ghostKey = () => 'faro-v2-ghost-' + MAP_SEED;
 
   let world = genWorld(MAP_SEED);
   let G = null;
@@ -285,6 +285,7 @@
     }
     for (const r of world.rubble) check(r, (px, py) => U.dist(px, py, r.x, r.y) - 43);
     for (const b of world.wrecks) {
+      if (b.unstable && !b.exploded) continue; // su bonus es zafar de la explosión
       check(b, (px, py) => {
         const dx = Math.max(b.x - px, 0, px - (b.x + b.w)), dy = Math.max(b.y - py, 0, py - (b.y + b.h));
         return Math.hypot(dx, dy) - 17;
@@ -414,6 +415,128 @@
       FX.pop(t.x, t.y - 80, 'TANQUE LLENO', '#5887FF', 26);
       Sfx.fill();
       Input.rumble(0.3, 0.9, 220);
+    }
+  }
+
+  // --------------------------------------------------- eventos en el camino
+
+  function updateEvents(dt) {
+    const t = G.truck;
+
+    // Autos inestables: se arman al acercarte y explotan tras una mecha corta.
+    for (const b of world.wrecks) {
+      if (!b.unstable || b.exploded) continue;
+      const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+      if (!b.armed && U.dist(t.x, t.y, cx, cy) < 190) {
+        b.armed = true; b.fuse = 0.75;
+        FX.pop(cx, cy - 46, '¡VA A EXPLOTAR!', '#FF3C38', 20);
+        Sfx.fuse();
+        Input.rumble(0.1, 0.4, 150);
+      }
+      if (!b.armed) continue;
+      b.fuse -= dt;
+      if (Math.random() < 40 * dt) {
+        FX.emit({ x: cx + U.rand(-20, 20), y: cy + U.rand(-12, 12), vx: U.rand(-120, 120), vy: U.rand(-160, 40), life: 0.3, size: 3, color: '255,210,140', drag: 2 });
+      }
+      if (b.fuse <= 0) explode(b, cx, cy);
+    }
+
+    // Derrumbes: aviso, temblor y la calle queda cortada.
+    for (const c of world.collapses) {
+      if (c.state === 'idle' && U.dist(t.x, t.y, c.x, c.y) < 430) {
+        c.state = 'warn'; c.t = 1.2;
+        banner('¡DERRUMBE EN ' + c.street.toUpperCase() + '!', 'fire');
+        Sfx.rumbleLow();
+        Input.rumble(0.7, 0.2, 1200);
+      } else if (c.state === 'warn') {
+        c.t -= dt;
+        cam.shake = Math.max(cam.shake, 3.5);
+        const r = c.rect;
+        if (Math.random() < 30 * dt) {
+          const x = r.x + Math.random() * r.w, y = r.y + Math.random() * r.h;
+          FX.emit({ x: x - c.dir.x * 60, y: y - c.dir.y * 60, vx: c.dir.x * U.rand(40, 120), vy: c.dir.y * U.rand(40, 120), life: 0.8, size: U.rand(12, 22), grow: 20, add: false, color: '70,66,60', a: 0.5, drag: 1 });
+        }
+        if (c.t <= 0) collapse(c);
+      }
+    }
+
+    // Civil atrapado: aparece a los 5 s y hay que llegar antes de que se acabe su tiempo.
+    const tr = world.trapped;
+    if (!tr) return;
+    if (tr.state === 'idle' && G.elapsed >= 5) {
+      tr.state = 'active'; tr.t = 9;
+      banner('¡CIVIL ATRAPADO EN ' + tr.street.toUpperCase() + '!', 'water');
+      Sfx.radio();
+      Input.rumble(0.2, 0.5, 200);
+    } else if (tr.state === 'active') {
+      tr.t -= dt;
+      if (U.dist(t.x, t.y, tr.x, tr.y) < 55) {
+        tr.state = 'saved';
+        G.rescued++; G.heroic = true;
+        G.time += 3; G.style += 300;
+        FX.pop(tr.x, tr.y - 40, '¡RESCATE HEROICO! +3s', '#16A34A', 26);
+        for (let i = 0; i < 26; i++) {
+          const a = Math.random() * Math.PI * 2, v = U.rand(60, 200);
+          FX.emit({ x: tr.x, y: tr.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.8, size: U.rand(4, 10), color: '240,244,250', drag: 3 });
+        }
+        Sfx.pickup(); Sfx.fill();
+        Input.rumble(0.4, 0.9, 300);
+        refreshCivIcons();
+      } else if (tr.t <= 0) {
+        tr.state = 'lost';
+        banner('CIVIL PERDIDO', 'slow');
+        Sfx.comboLost();
+      }
+    }
+  }
+
+  function explode(b, cx, cy) {
+    b.exploded = true; b.armed = false;
+    const t = G.truck;
+    const d = U.dist(t.x, t.y, cx, cy);
+    world.fires.push({ x: cx, y: cy, r: 46, ph: Math.random() * 6 });
+    for (let i = 0; i < 40; i++) {
+      const a = Math.random() * Math.PI * 2, v = U.rand(120, 520);
+      FX.emit({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: U.rand(0.3, 0.8), size: U.rand(6, 16), color: i % 3 ? '242,112,60' : '255,210,140', drag: 3 });
+    }
+    for (let i = 0; i < 14; i++) {
+      FX.emit({ x: cx, y: cy, vx: U.rand(-90, 90), vy: U.rand(-90, 90), life: U.rand(1.5, 2.6), size: U.rand(30, 50), grow: 40, add: false, color: '16,18,22', a: 0.6, drag: 0.8 });
+    }
+    cam.shake = Math.max(cam.shake, 20);
+    G.flash = 0.35; G.flashColor = '255,160,80';
+    Sfx.boom();
+    Input.rumble(1, 1, 450);
+    if (d > 240) return;
+    const k = 1 - d / 240, nx = (t.x - cx) / (d || 1), ny = (t.y - cy) / (d || 1);
+    t.vx += nx * 700 * k; t.vy += ny * 700 * k;
+    t.oil = Math.max(t.oil, 0.35);
+    if (d < 115 && t.inv <= 0) {
+      G.time -= 1; G.crashes++; t.inv = 0.8;
+      FX.pop(t.x, t.y - 50, '−1s', '#FF3C38', 30);
+      loseCombo();
+    } else if (d >= 115 && Math.hypot(t.vx, t.vy) > 200) {
+      award(t.x, t.y);
+      FX.pop(t.x, t.y - 80, '¡ZAFASTE!', '#F2A93E', 26);
+    }
+  }
+
+  function collapse(c) {
+    c.state = 'done';
+    const r = c.rect;
+    world.solids.push(r);
+    for (let i = 0; i < 30; i++) {
+      FX.emit({ x: r.x + Math.random() * r.w, y: r.y + Math.random() * r.h, vx: U.rand(-160, 160), vy: U.rand(-160, 160), life: U.rand(1, 2), size: U.rand(20, 40), grow: 30, add: false, color: '70,66,60', a: 0.55, drag: 1.2 });
+    }
+    cam.shake = Math.max(cam.shake, 16);
+    Sfx.crash();
+    Input.rumble(1, 0.6, 400);
+    // Si el camión quedó debajo, lo empuja fuera del derrumbe y cuesta 1 s.
+    const t = G.truck;
+    if (circleVsAABB(t.x, t.y, 30, r)) {
+      if (c.h) t.x = t.x < r.x + r.w / 2 ? r.x - 45 : r.x + r.w + 45;
+      else t.y = t.y < r.y + r.h / 2 ? r.y - 45 : r.y + r.h + 45;
+      t.vx *= -0.3; t.vy *= -0.3;
+      if (t.inv <= 0) { G.time -= 1; G.crashes++; t.inv = 0.8; FX.pop(t.x, t.y - 50, '−1s', '#FF3C38', 30); loseCombo(); }
     }
   }
 
@@ -606,7 +729,7 @@
     rank.className = 'rank rank-' + G.rank;
     $('res-time').textContent = win ? `${Math.max(0, G.time).toFixed(1)} s` : '0.0 s';
     $('res-arrive').textContent = G.arriveT ? `${G.arriveT.toFixed(1)} s` : '—';
-    $('res-civ').textContent = `${G.rescued} / ${world.civilians.length}`;
+    $('res-civ').textContent = `${G.rescued} / ${world.civilians.length + (world.trapped ? 1 : 0)}`;
     $('res-combo').textContent = G.bestCombo ? `x${G.bestCombo} · ${G.nearCount} pasadas` : '—';
     $('res-spread').textContent = win ? ['Contenido', '1 edificio', '2 edificios'][G.stage] : '—';
     $('res-crash').textContent = String(G.crashes);
@@ -849,6 +972,7 @@
         updateTruck(dt);
         nearMiss(dt);
         updateTasks(dt);
+        updateEvents(dt);
         updateSpread();
         updateGhost(dt);
         updateWorld(dt);
@@ -923,16 +1047,21 @@
   function buildCivIcons() {
     const box = $('hud-civ');
     box.innerHTML = '';
-    world.civilians.forEach(() => {
+    const n = world.civilians.length + (world.trapped ? 1 : 0);
+    for (let i = 0; i < n; i++) {
       const s = document.createElement('span');
-      s.className = 'civ-icon';
+      s.className = 'civ-icon' + (i === n - 1 && world.trapped ? ' special' : '');
       s.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c1-4.2 4-6.5 7.5-6.5s6.5 2.3 7.5 6.5"/></svg>';
       box.appendChild(s);
-    });
+    }
   }
   function refreshCivIcons() {
     const icons = $('hud-civ').children;
-    for (let i = 0; i < icons.length; i++) icons[i].classList.toggle('on', i < G.rescued);
+    const normal = G.rescued - (G.heroic ? 1 : 0);
+    for (let i = 0; i < icons.length; i++) {
+      const special = icons[i].classList.contains('special');
+      icons[i].classList.toggle('on', special ? !!G.heroic : i < normal);
+    }
   }
 
   function buildQTE() {
@@ -1079,6 +1208,9 @@
       if (dbg === 'aim') { G.elapsed = 19; updateSpread(); updateSpread(); }
     }
     if (dbg === 'lose') G.time = 0.3;
+    if (dbg === 'derrumbe') { const c = world.collapses[0]; t.x = c.x + (c.h ? 340 : 0); t.y = c.y + (c.h ? 0 : 340); t.a = c.h ? Math.PI : -Math.PI / 2; }
+    if (dbg === 'explosion') { const b = world.wrecks.find((x) => x.unstable); t.x = b.x + b.w / 2 + 250; t.y = b.y + b.h / 2; t.a = Math.PI; }
+    if (dbg === 'atrapado') { G.elapsed = 4.9; const tr = world.trapped; t.x = tr.x + 260; t.y = tr.y; }
     if (dbg === 'win') { G.arriveT = 12.3; G.time = 9.4; G.rescued = 2; G.style = 900; G.bestCombo = 4; G.nearCount = 6; finish(true); }
     cam.x = t.x; cam.y = t.y;
   }
