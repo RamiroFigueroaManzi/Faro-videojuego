@@ -214,7 +214,7 @@ const Sfx = (() => {
     siren.phase += dt;
     const hi = Math.floor(siren.phase / 0.55) % 2 === 0;
     siren.o.frequency.setTargetAtTime(hi ? 880 : 660, t, 0.015);
-    siren.g.gain.setTargetAtTime(active ? 0.022 : 0, t, 0.15);
+    siren.g.gain.setTargetAtTime(active ? 0.008 : 0, t, 0.15);
     engine.o.frequency.setTargetAtTime(65 + speedNorm * 130, t, 0.05);
     engine.f.frequency.setTargetAtTime(700 + speedNorm * 900, t, 0.05);
     engine.g.gain.setTargetAtTime(active ? 0.06 + speedNorm * 0.08 : 0, t, 0.12);
