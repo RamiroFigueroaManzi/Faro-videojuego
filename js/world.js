@@ -11,9 +11,20 @@ const blockRect = (i, j) => ({ x: i * CFG.CELL + CFG.R, y: j * CFG.CELL + CFG.R,
 
 const STREETS = ['Av. Colón', 'San Martín', 'Belgrano', 'Rivadavia', 'Sarmiento', 'Mitre', 'Av. Libertador', 'Urquiza', 'Moreno', 'Alsina', 'Lavalle', 'Brown'];
 const INCIDENTS = ['INCENDIO ESTRUCTURAL', 'INCENDIO EN DEPÓSITO', 'INCENDIO EN VIVIENDA', 'INCENDIO EN TALLER'];
+// Zonas fijas: mismo mapa para todos → récords comparables y fantasma.
+const MAPS = [
+  { seed: 1107, name: 'CENTRO' },
+  { seed: 2291, name: 'PUERTO' },
+  { seed: 3517, name: 'BARRIO NORTE' },
+  { seed: 4783, name: 'PARQUE SUR' },
+  { seed: 5903, name: 'VILLA CRESPO' },
+];
+const SPREAD_AT = [10, 18];
+
 const ROOF_SHADES = ['#12161D', '#151A22', '#0F1319', '#171B21', '#11151B'];
 
-function genWorld() {
+function genWorld(seed) {
+  if (seed != null) U.seed(seed);
   const { B, R, COLS, ROWS, CELL, W, H } = CFG;
   const w = {
     W, H, blocks: [], solids: [], circles: [], oils: [], hydrants: [], civilians: [], cars: [],
@@ -32,9 +43,15 @@ function genWorld() {
     ...inc, rect: ib, cx: ib.x + B / 2, cy: ib.y + B / 2,
     type: U.pick(INCIDENTS), street: `${U.pick(STREETS)} ${U.randi(100, 2900)}`, fire: 1, points: [],
   };
-  for (let k = 0; k < 5; k++) {
-    w.incident.points.push({ x: ib.x + U.rand(70, B - 70), y: ib.y + U.rand(70, B - 70), r: U.rand(50, 80), ph: Math.random() * 6 });
-  }
+  const firePts = (r, n, stage) => {
+    for (let k = 0; k < n; k++) {
+      w.incident.points.push({
+        x: r.x + U.rand(80, B - 80), y: r.y + U.rand(80, B - 80), r: U.rand(52, 72),
+        ph: U.r() * 6, hp: 1, active: stage === 0, stage,
+      });
+    }
+  };
+  firePts(ib, 4, 0);
 
   const sb = blockRect(station.i, station.j);
   w.start = { x: sb.x + 120, y: roadY(station.j) + 30, a: 0 };
@@ -68,6 +85,11 @@ function genWorld() {
     w.blocks.push(b);
   }
 
+  // Propagación: hasta 2 edificios vecinos se prenden a los SPREAD_AT segundos
+  const neigh = w.blocks.filter((b) => b.type === 'building' && Math.abs(b.i - inc.i) + Math.abs(b.j - inc.j) === 1);
+  w.incident.spread = U.shuffle(neigh).slice(0, 2);
+  w.incident.spread.forEach((b, k) => firePts(b, 3, k + 1));
+
   // Muros del borde del mapa
   const T = 200;
   w.solids.push({ x: -T, y: -T, w: W + 2 * T, h: T, kind: 'wall' });
@@ -79,7 +101,7 @@ function genWorld() {
   for (let j = 0; j <= ROWS; j++) for (let i = 0; i <= COLS; i++) {
     const sx = i === 0 ? 1 : i === COLS ? -1 : U.pick([-1, 1]);
     const sy = j === 0 ? 1 : j === ROWS ? -1 : U.pick([-1, 1]);
-    w.lamps.push({ x: roadX(i) + sx * 84, y: roadY(j) + sy * 84, ph: Math.random() * 6 });
+    w.lamps.push({ x: roadX(i) + sx * 84, y: roadY(j) + sy * 84, ph: U.r() * 6 });
   }
 
   // Tramos de calle entre intersecciones
@@ -106,18 +128,18 @@ function genWorld() {
     if (w.civilians.length >= 4) break;
     const p = pt(s, U.rand(0.2, 0.8), U.pick([-1, 1]) * 66);
     if (!free(p, 70)) continue;
-    w.civilians.push({ x: p.x, y: p.y, picked: false, ph: Math.random() * 6 });
+    w.civilians.push({ x: p.x, y: p.y, picked: false, ph: U.r() * 6 });
     taken.push({ x: p.x, y: p.y, r: 70 });
   }
 
   // Obstáculos: uno por tramo, bloqueando un carril
   for (const s of U.shuffle(w.segs.slice())) {
-    if (Math.random() < 0.3) continue;
+    if (U.r() < 0.3) continue;
     const sd = U.pick([-1, 1]), t = U.rand(0.25, 0.75);
     const p = pt(s, t, sd * 38);
     if (!free(p, 70)) continue;
     taken.push({ x: p.x, y: p.y, r: 90 });
-    const roll = Math.random();
+    const roll = U.r();
     if (roll < 0.3) {
       const pts = [];
       const n = U.randi(7, 10);
@@ -128,10 +150,10 @@ function genWorld() {
       w.circles.push({ x: p.x, y: p.y, r: 26, kind: 'rubble' });
     } else if (roll < 0.55) {
       const ww = s.h ? 66 : 34, hh = s.h ? 34 : 66;
-      const box = { x: p.x - ww / 2, y: p.y - hh / 2, w: ww, h: hh, kind: 'wreck', burning: Math.random() < 0.75, horiz: !!s.h };
+      const box = { x: p.x - ww / 2, y: p.y - hh / 2, w: ww, h: hh, kind: 'wreck', burning: U.r() < 0.75, horiz: !!s.h };
       w.wrecks.push(box);
       w.solids.push(box);
-      if (box.burning) w.fires.push({ x: p.x, y: p.y, r: 30, ph: Math.random() * 6 });
+      if (box.burning) w.fires.push({ x: p.x, y: p.y, r: 30, ph: U.r() * 6 });
     } else if (roll < 0.78) {
       for (let k = 0; k < 3; k++) {
         const c = pt(s, t, sd * (16 + k * 24));
@@ -140,13 +162,13 @@ function genWorld() {
         w.circles.push(cone);
       }
     } else {
-      w.oils.push({ x: p.x, y: p.y, r: 50, rot: Math.random() * 3 });
+      w.oils.push({ x: p.x, y: p.y, r: 50, rot: U.r() * 3 });
     }
   }
 
   // Tránsito civil
   for (let tries = 0; w.cars.length < 5 && tries < 60; tries++) {
-    const horiz = Math.random() < 0.55;
+    const horiz = U.r() < 0.55;
     const idx = horiz ? U.randi(0, ROWS) : U.randi(0, COLS);
     const c = horiz ? roadY(idx) : roadX(idx);
     const len = horiz ? W : H;
@@ -161,6 +183,7 @@ function genWorld() {
     w.cars.push(car);
   }
 
+  U.unseed();
   return w;
 }
 
@@ -176,7 +199,7 @@ function carPlace(car) {
 }
 
 function genRoof(b, s) {
-  const vertical = Math.random() < 0.5;
+  const vertical = U.r() < 0.5;
   const n = U.randi(1, 3);
   const cuts = n === 1 ? [0, 1] : n === 2 ? [0, U.rand(0.35, 0.65), 1] : [0, U.rand(0.25, 0.4), U.rand(0.6, 0.75), 1];
   for (let k = 0; k < cuts.length - 1; k++) {
@@ -210,7 +233,7 @@ function genPark(b, w) {
     const x = b.x + U.rand(40, b.w - 40), y = b.y + U.rand(40, b.h - 40);
     if (U.dist(x, y, cx, cy) < 110) continue;
     if (local.some((t) => U.dist(t.x, t.y, x, y) < 95)) continue;
-    const tree = { x, y, r: U.rand(26, 38), ph: Math.random() * 6 };
+    const tree = { x, y, r: U.rand(26, 38), ph: U.r() * 6 };
     local.push(tree);
     w.trees.push(tree);
     w.circles.push({ x, y, r: 16, kind: 'tree' });

@@ -25,6 +25,7 @@
       <div class="timer-label">TIEMPO DE RESPUESTA</div>
       <div id="hud-timer" class="timer">30.0</div>
       <div id="hud-obj" class="objective"><span class="dot"></span><span id="hud-obj-text"></span></div>
+      <div id="banner" class="banner"></div>
     </div>
 
     <div class="hud-tr glass">
@@ -32,11 +33,22 @@
       <canvas id="minimap" width="480" height="300"></canvas>
     </div>
 
+    <div id="combo" class="combo hidden">
+      <div class="combo-x">x<span id="combo-n">1</span></div>
+      <div class="combo-label">COMBO · <span id="combo-pts" class="mono">0</span> pts</div>
+      <div class="combo-bar"><div id="combo-t"></div></div>
+    </div>
+
     <div class="hud-bl glass">
       <div id="hud-tank" class="gauge-row">
         <span class="label">TANQUE</span>
         <div class="tank"><div id="hud-tank-fill"></div></div>
         <span id="hud-tank-pct" class="mono">VACÍO</span>
+      </div>
+      <div id="hud-turbo" class="gauge-row">
+        <span class="label">TURBO</span>
+        <div class="tank turbo"><div id="hud-turbo-fill"></div></div>
+        <span class="mono key-hint"><span class="pad-only">R1</span><span class="kb-only">SHIFT</span></span>
       </div>
       <div class="gauge-row">
         <span class="label">CIVILES</span>
@@ -48,22 +60,23 @@
     <div class="hud-br chip mono" id="hud-device"></div>
 
     <div id="prompt" class="prompt hidden">
-      <div class="prompt-btn">
-        <svg class="ring" viewBox="0 0 60 60">
-          <circle cx="30" cy="30" r="26" class="ring-bg"/>
-          <circle cx="30" cy="30" r="26" class="ring-fg" id="prompt-ring"/>
-        </svg>
-        <span data-glyph="0"></span>
-      </div>
-      <div>
-        <div id="prompt-text" class="prompt-text">CARGAR AGUA</div>
-        <div id="prompt-key" class="prompt-key mono"></div>
+      <span class="prompt-glyph" data-glyph="0"></span>
+      <div class="prompt-main">
+        <div class="prompt-row"><span id="prompt-text" class="prompt-text">CARGAR AGUA</span><span id="prompt-key" class="prompt-key mono"></span></div>
+        <div id="pgauge" class="pgauge hidden">
+          <div id="pg-zone" class="pg-zone"><div class="pg-perfect"></div></div>
+          <div id="pg-needle" class="pg-needle"></div>
+        </div>
       </div>
     </div>
 
     <div id="qte" class="qte glass hidden">
-      <div class="qte-head"><span class="badge critical">ATAQUE</span><span class="qte-title">SEGUÍ LA SECUENCIA</span></div>
+      <div class="qte-head"><span class="badge critical">ATAQUE</span><span id="qte-title" class="qte-title">ARMÁ LA LÍNEA</span></div>
       <div id="qte-seq" class="qte-seq"></div>
+      <div id="aim-help" class="aim-help hidden">
+        <span class="pad-only"><b>STICK DER.</b> apuntar · <b>R2</b> o <b>✕</b> tirar agua</span>
+        <span class="kb-only"><b>MOUSE / FLECHAS</b> apuntar · <b>CLIC / ESPACIO</b> tirar agua</span>
+      </div>
       <div class="firebar-row"><span class="label">FUEGO</span><div class="firebar"><div id="qte-fire"></div></div></div>
     </div>
 
@@ -79,15 +92,31 @@
         <h1 class="wordmark">FARO</h1>
       </div>
       <div class="subtitle">RESPUESTA<span class="accent-bar"></span></div>
-      <p class="tagline">30 segundos. Un incendio. Cargá agua, rescatá a quien puedas y llegá antes de que sea tarde.</p>
+      <p class="tagline">30 segundos. Un incendio que crece. Cargá agua, rescatá a quien puedas y pasá rozando para cargar el turbo.</p>
+
+      <div class="map-sel">
+        <span class="arrow">◂</span>
+        <span class="map-label">ZONA</span>
+        <b id="map-name">CENTRO</b>
+        <span id="map-idx" class="mono dim">1/5</span>
+        <span class="arrow">▸</span>
+      </div>
+
       <div class="cta"><span data-glyph="0"></span><span>PRESIONÁ PARA DESPACHAR</span><span class="kb-only mono">(ESPACIO)</span></div>
 
-      <div class="controls glass">
-        <div class="ctl"><span class="k">STICK IZQ.</span><span>Dirigir y acelerar</span></div>
-        <div class="ctl"><span class="k">R2 / L2</span><span>Acelerar / frenar</span></div>
-        <div class="ctl"><span class="k"><span data-glyph="0"></span> machacar</span><span>Cargar agua en el hidrante</span></div>
-        <div class="ctl"><span class="k"><span data-glyph="0"></span><span data-glyph="1"></span><span data-glyph="2"></span><span data-glyph="3"></span></span><span>Secuencia de ataque al fuego</span></div>
-        <div class="ctl kb"><span class="k mono">TECLADO</span><span>Flechas/WASD · Espacio · J K L I · Esc</span></div>
+      <div id="title-panels" class="title-panels">
+        <div class="controls glass">
+          <div class="ctl"><span class="k">STICK IZQ.</span><span>Dirigir y acelerar</span></div>
+          <div class="ctl"><span class="k">R2 / L2 · R1</span><span>Acelerar / frenar · <b class="accent">Turbo</b></span></div>
+          <div class="ctl"><span class="k">PASAR ROZANDO</span><span>Combo + carga de turbo</span></div>
+          <div class="ctl"><span class="k"><span data-glyph="0"></span> en la zona verde</span><span>Cargar agua en el hidrante</span></div>
+          <div class="ctl"><span class="k"><span data-glyph="0"></span><span data-glyph="1"></span><span data-glyph="2"></span><span data-glyph="3"></span></span><span>Armá la línea · después apuntá con el stick derecho</span></div>
+          <div class="ctl kb"><span class="k mono">TECLADO</span><span>WASD · Shift turbo · Espacio · J K L I · mouse para apuntar</span></div>
+        </div>
+        <div class="title-board glass">
+          <div class="board-title">TOP 5 · ZONA <span id="title-board-map"></span></div>
+          <ol id="title-board-list" class="board"></ol>
+        </div>
       </div>
       <div class="best mono" id="title-best"></div>
     </div>
@@ -105,10 +134,11 @@
       <div id="brief-addr" class="brief-addr"></div>
       <div id="brief-radio" class="radio mono"></div>
       <ol class="steps">
-        <li><span class="step-dot water"></span>Cargá agua: frená en un <b>hidrante</b> y machacá <span data-glyph="0"></span></li>
-        <li><span class="step-dot civ"></span>Pasá por los <b>civiles</b>: +2 s cada uno</li>
-        <li><span class="step-dot fire"></span>En el incendio, seguí la <b>secuencia</b> de botones</li>
+        <li><span class="step-dot water"></span>Hidrante: apretá <span data-glyph="0"></span> cuando la aguja pase por la <b>zona verde</b></li>
+        <li><span class="step-dot civ"></span>Rescatá <b>civiles</b> (+2 s) y pasá rozando autos para el <b>turbo</b></li>
+        <li><span class="step-dot fire"></span>El fuego <b>se propaga</b> a los 10 s y a los 18 s: ¡llegá antes!</li>
       </ol>
+      <div id="brief-rec" class="brief-rec mono"></div>
     </div>
     <div id="countdown" class="countdown"></div>
   </div>
@@ -122,18 +152,34 @@
         <div id="res-sub" class="res-sub"></div>
         <span class="accent-bar"></span>
       </div>
-      <div class="res-body">
-        <div id="res-rank" class="rank">S</div>
-        <dl class="stats">
-          <div><dt>Tiempo restante</dt><dd id="res-time" class="mono"></dd></div>
-          <div><dt>Civiles rescatados</dt><dd id="res-civ" class="mono"></dd></div>
-          <div><dt>Choques</dt><dd id="res-crash" class="mono"></dd></div>
-          <div><dt>Errores de secuencia</dt><dd id="res-mist" class="mono"></dd></div>
-          <div class="total"><dt>Puntaje</dt><dd id="res-score" class="mono"></dd></div>
-        </dl>
+      <div class="res-cols">
+        <div class="res-left">
+          <div class="res-body">
+            <div id="res-rank" class="rank">S</div>
+            <dl class="stats">
+              <div><dt>Tiempo restante</dt><dd id="res-time" class="mono"></dd></div>
+              <div><dt>Llegada</dt><dd id="res-arrive" class="mono"></dd></div>
+              <div><dt>Civiles</dt><dd id="res-civ" class="mono"></dd></div>
+              <div><dt>Mejor combo</dt><dd id="res-combo" class="mono"></dd></div>
+              <div><dt>Propagación</dt><dd id="res-spread" class="mono"></dd></div>
+              <div><dt>Choques</dt><dd id="res-crash" class="mono"></dd></div>
+              <div class="total"><dt>Puntaje</dt><dd id="res-score" class="mono"></dd></div>
+            </dl>
+          </div>
+        </div>
+        <div class="res-right">
+          <div id="ini" class="ini hidden">
+            <div class="ini-title">¡ENTRASTE AL TOP 10!</div>
+            <div class="ini-sub">Ingresá tus iniciales</div>
+            <div class="ini-slots"><span id="ini0" class="slot">A</span><span id="ini1" class="slot">A</span><span id="ini2" class="slot">A</span></div>
+            <div class="ini-help mono"><span class="pad-only">▲▼ letra · ◀▶ mover · ✕ siguiente</span><span class="kb-only">Escribí tus letras · Enter confirmar</span></div>
+          </div>
+          <div class="board-title">TOP 10 · ZONA <span id="res-board-map"></span></div>
+          <ol id="res-board" class="board"></ol>
+        </div>
       </div>
       <div id="res-best" class="res-best mono"></div>
-      <div class="res-cta">
+      <div id="res-cta" class="res-cta">
         <span class="act"><span data-glyph="0"></span> REINTENTAR <span class="kb-only mono">ESPACIO</span></span>
         <span class="act dim"><span data-glyph="1"></span> MENÚ <span class="kb-only mono">L</span></span>
       </div>

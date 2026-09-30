@@ -2,7 +2,7 @@
 
 const Sfx = (() => {
   let ctx = null, master = null, muted = false, noiseBuf = null;
-  let siren = null, engine = null, confirmed = false;
+  let siren = null, engine = null, water = null, confirmed = false;
   const VOL = 1;
 
   // Crea el contexto (o lo reanuda). Debe llamarse desde un clic o una tecla:
@@ -80,6 +80,13 @@ const Sfx = (() => {
     eo.type = 'sawtooth'; eo.frequency.value = 70; ef.type = 'lowpass'; ef.frequency.value = 900; ef.Q.value = 2; eg.gain.value = 0;
     eo.connect(ef); ef.connect(eg); eg.connect(master); eo.start();
     engine = { o: eo, g: eg, f: ef };
+
+    // Chorro de agua: ruido en bucle filtrado, se abre al disparar la manguera.
+    const ws = ctx.createBufferSource(), wf = ctx.createBiquadFilter(), wg = ctx.createGain();
+    ws.buffer = getNoise(); ws.loop = true;
+    wf.type = 'bandpass'; wf.frequency.value = 2400; wf.Q.value = 0.7; wg.gain.value = 0;
+    ws.connect(wf); wf.connect(wg); wg.connect(master); ws.start();
+    water = { g: wg, on: false };
   }
 
   // ------------------------------------------------------------- música
@@ -207,7 +214,7 @@ const Sfx = (() => {
   }
 
   // Sirena "hi-lo" + motor que sube con la velocidad.
-  function update(dt, speedNorm, active) {
+  function update(dt, speedNorm, active, boost = false) {
     if (!ctx || !siren) return;
     musicTick();
     const t = ctx.currentTime;
@@ -215,9 +222,10 @@ const Sfx = (() => {
     const hi = Math.floor(siren.phase / 0.55) % 2 === 0;
     siren.o.frequency.setTargetAtTime(hi ? 880 : 660, t, 0.015);
     siren.g.gain.setTargetAtTime(active ? 0.008 : 0, t, 0.15);
-    engine.o.frequency.setTargetAtTime(65 + speedNorm * 130, t, 0.05);
-    engine.f.frequency.setTargetAtTime(700 + speedNorm * 900, t, 0.05);
-    engine.g.gain.setTargetAtTime(active ? 0.06 + speedNorm * 0.08 : 0, t, 0.12);
+    engine.o.frequency.setTargetAtTime(65 + speedNorm * 130 + (boost ? 60 : 0), t, 0.05);
+    engine.f.frequency.setTargetAtTime(700 + speedNorm * 900 + (boost ? 1200 : 0), t, 0.05);
+    engine.g.gain.setTargetAtTime(active ? 0.06 + speedNorm * 0.08 + (boost ? 0.05 : 0) : 0, t, 0.12);
+    water.g.gain.setTargetAtTime(water.on ? 0.22 : 0, t, 0.05);
   }
 
   function toggleMute() {
@@ -230,6 +238,15 @@ const Sfx = (() => {
     init, update, toggleMute, setMusic,
     get muted() { return muted; },
     get running() { return !!ctx && ctx.state === 'running'; },
+    spray: (on) => { if (water) water.on = on; },
+    near: (c) => { const f = 700 * Math.pow(2, Math.min(c, 12) / 12); tone(f, 0.14, 'triangle', 0.2, f * 1.5); noise(0.18, 0.15, 5000, 0, 'highpass'); },
+    boost: () => { noise(0.5, 0.35, 1200, 0, 'bandpass'); tone(200, 0.45, 'sawtooth', 0.12, 520); },
+    comboLost: () => tone(300, 0.25, 'triangle', 0.15, 150),
+    gaugeHit: (perfect) => { tone(perfect ? 1175 : 880, 0.12, 'triangle', 0.25); if (perfect) tone(1760, 0.2, 'triangle', 0.18, null, 0.07); },
+    gaugeMiss: () => tone(200, 0.18, 'square', 0.14, 120),
+    spreadAlarm: () => { for (let i = 0; i < 3; i++) tone(520, 0.16, 'sawtooth', 0.14, 780, i * 0.22); noise(0.9, 0.3, 500); },
+    out: () => { noise(0.6, 0.35, 2600, 0, 'highpass'); tone(660, 0.18, 'triangle', 0.2); tone(990, 0.25, 'triangle', 0.18, null, 0.1); },
+    letter: () => tone(1200, 0.04, 'square', 0.08),
     ui: () => tone(880, 0.07, 'triangle', 0.18),
     mash: (p) => tone(280 + p * 520, 0.07, 'square', 0.12),
     fill: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, 'triangle', 0.22, null, i * 0.07)),

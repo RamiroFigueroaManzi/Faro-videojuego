@@ -120,7 +120,68 @@ const Render = (() => {
     g.drawImage(soft(color), x - r, y - r, r * 2, r * 2);
   }
 
+  function fireLevel(w) {
+    let t = 0;
+    for (const p of w.incident.points) if (p.active && p.hp > 0) t += p.hp;
+    return t / 4;
+  }
+
   // ---------------------------------------------------------------- mundo
+
+  function drawSkids(w, vis) {
+    if (!w.skids || !w.skids.length) return;
+    ctx.strokeStyle = 'rgba(58,52,43,0.55)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (const k of w.skids) {
+      if (!vis(k[0], k[1], 20)) continue;
+      ctx.moveTo(k[0], k[1]); ctx.lineTo(k[2], k[3]);
+    }
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+  }
+
+  // Fantasma del récord: silueta pálida y translúcida.
+  function drawGhost(G, T) {
+    const g = G && G.ghostPos;
+    if (!g) return;
+    ctx.save();
+    ctx.translate(g.x, g.y);
+    ctx.save(); ctx.rotate(g.a);
+    ctx.globalAlpha = 0.3 + 0.08 * Math.sin(T * 5);
+    ctx.fillStyle = '#8FB8F0';
+    rr(ctx, -38, -17, 76, 34, 7); ctx.fill();
+    ctx.globalAlpha = 0.7; ctx.strokeStyle = '#C8DAFF'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.restore();
+    ctx.globalAlpha = 0.85;
+    ctx.font = '600 13px Oswald'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#C8DAFF'; ctx.shadowColor = '#5887FF'; ctx.shadowBlur = 10;
+    ctx.fillText('RÉCORD · ' + (g.name || '???'), 0, -44);
+    ctx.restore();
+  }
+
+  function drawReticle(G, T) {
+    const a = G && G.atk;
+    if (!a || a.phase !== 'aim') return;
+    const t = G.truck, fx = Math.cos(t.a), fy = Math.sin(t.a);
+    const nx = t.x + fx * 20, ny = t.y + fy * 20;
+    ctx.save();
+    if (!a.spraying) {
+      ctx.setLineDash([6, 10]); ctx.strokeStyle = 'rgba(143,184,240,0.35)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(nx, ny); ctx.lineTo(a.rx, a.ry); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const pulse = 1 + Math.sin(T * 8) * 0.06;
+    ctx.translate(a.rx, a.ry);
+    ctx.shadowColor = '#5887FF'; ctx.shadowBlur = 14;
+    ctx.strokeStyle = a.spraying ? '#DCE6FF' : '#8FB8F0'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 0, 58 * pulse, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 2.5;
+    for (let k = 0; k < 4; k++) {
+      const an = k * Math.PI / 2 + T * 0.8;
+      ctx.beginPath(); ctx.moveTo(Math.cos(an) * 40, Math.sin(an) * 40); ctx.lineTo(Math.cos(an) * 72, Math.sin(an) * 72); ctx.stroke();
+    }
+    ctx.fillStyle = '#DCE6FF'; ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
 
   function drawGround(w, vis, T) {
     const { W, H, R } = { ...CFG };
@@ -174,7 +235,7 @@ const Render = (() => {
     for (const b of w.blocks) {
       if (!b.parts.length || !vis(b.x + b.w / 2, b.y + b.h / 2, b.w)) continue;
       for (const p of b.parts) {
-        ctx.fillStyle = b.type === 'station' ? '#1A1311' : b.type === 'incident' ? '#140D0B' : p.shade;
+        ctx.fillStyle = b.type === 'station' ? '#1A1311' : (b.type === 'incident' || b.burning) ? '#140D0B' : p.shade;
         ctx.fillRect(p.x, p.y, p.w, p.h);
         ctx.strokeStyle = '#232A35'; ctx.lineWidth = 1.5;
         ctx.strokeRect(p.x + 0.75, p.y + 0.75, p.w - 1.5, p.h - 1.5);
@@ -199,7 +260,7 @@ const Render = (() => {
         }
       }
       if (b.type === 'station') drawStationRoof(b, T);
-      if (b.type === 'incident') drawIncidentRoof(b, w, T);
+      if (b.type === 'incident' || b.burning) drawIncidentRoof(b, w, T);
     }
   }
 
@@ -227,6 +288,7 @@ const Render = (() => {
       ctx.stroke();
     }
     for (const p of w.incident.points) {
+      if (!p.active || p.x < b.x || p.x > b.x + b.w || p.y < b.y || p.y > b.y + b.h) continue;
       ctx.fillStyle = 'rgba(0,0,0,0.75)';
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.55, 0, Math.PI * 2); ctx.fill();
     }
@@ -408,11 +470,9 @@ const Render = (() => {
 
     for (const l of w.lamps) punch(l.x, l.y, 230, 0.62 + Math.sin(T * 3 + l.ph) * 0.03);
     for (const f of w.fires) punch(f.x, f.y, 210 * (0.92 + 0.08 * Math.sin(T * 13 + f.ph)), 0.8);
-    const fire = w.incident.fire;
-    if (fire > 0.02) {
-      for (const p of w.incident.points) punch(p.x, p.y, 260 * fire + 60, 0.9);
-      punch(w.incident.cx, w.incident.cy, 620 * (0.94 + 0.06 * Math.sin(T * 9)) * (0.4 + 0.6 * fire), 0.95);
-    }
+    const fire = fireLevel(w);
+    for (const p of w.incident.points) if (p.active && p.hp > 0) punch(p.x, p.y, 150 + 170 * p.hp, 0.9);
+    if (fire > 0.02) punch(w.incident.cx, w.incident.cy, 620 * (0.94 + 0.06 * Math.sin(T * 9)) * Math.min(1.3, 0.4 + 0.6 * fire), 0.95);
     if (G && G.tank < 1) for (const h of w.hydrants) punch(h.zx, h.zy, 130, 0.5);
     for (const c of w.civilians) if (!c.picked) punch(c.x, c.y, 80, 0.45);
     for (const c of w.cars) {
@@ -450,10 +510,10 @@ const Render = (() => {
       const fl = 0.85 + 0.15 * Math.sin(T * 17 + f.ph);
       glow('242,112,60', f.x, f.y, 190, 0.32 * fl);
     }
-    const fire = w.incident.fire;
-    if (fire > 0.02) {
-      glow('220,38,38', w.incident.cx, w.incident.cy, 640, 0.22 * fire);
-      glow('242,112,60', w.incident.cx, w.incident.cy, 420, (0.3 + 0.05 * Math.sin(T * 11)) * fire);
+    const fire = fireLevel(w);
+    if (fire > 0.02) glow('220,38,38', w.incident.cx, w.incident.cy, 640, 0.22 * Math.min(1, fire));
+    for (const p of w.incident.points) {
+      if (p.active && p.hp > 0) glow('242,112,60', p.x, p.y, 150 + 160 * p.hp, (0.26 + 0.05 * Math.sin(T * 11 + p.ph)) * p.hp);
     }
     if (G && G.tank < 1) for (const h of w.hydrants) glow('59,130,246', h.zx, h.zy, 110, 0.28 + 0.08 * Math.sin(T * 4));
     for (const c of w.civilians) if (!c.picked) glow('243,245,247', c.x, c.y - 4, 46, 0.22 + 0.08 * Math.sin(T * 5 + c.ph));
@@ -469,12 +529,12 @@ const Render = (() => {
       for (let i = 0; i < 4; i++) {
         const ox = Math.sin(T * 7 + k + i * 1.7) * r * 0.35, oy = Math.cos(T * 5.3 + k + i * 2.1) * r * 0.35;
         const sz = r * (0.55 + 0.25 * Math.sin(T * 11 + k * 3 + i));
-        glow('242,112,60', x + ox, y + oy, sz * 1.4, 0.45 * a);
-        glow('255,176,96', x + ox * 0.6, y + oy * 0.6, sz * 0.6, 0.28 * a);
+        glow('230,80,40', x + ox, y + oy, sz * 1.4, 0.4 * a);
+        glow('255,150,80', x + ox * 0.6, y + oy * 0.6, sz * 0.55, 0.22 * a);
       }
     };
     for (const f of w.fires) if (vis(f.x, f.y, 60)) flame(f.x, f.y, f.r, f.ph, 1);
-    if (fire > 0.02) for (const p of w.incident.points) flame(p.x, p.y, p.r * (0.35 + 0.65 * fire), p.ph, Math.min(1, fire * 1.4));
+    for (const p of w.incident.points) if (p.active && p.hp > 0 && vis(p.x, p.y, 90)) flame(p.x, p.y, p.r * (0.3 + 0.7 * p.hp), p.ph, Math.min(1, p.hp * 1.4));
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
@@ -625,9 +685,11 @@ const Render = (() => {
 
     ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
     drawGround(w, vis, T);
+    drawSkids(w, vis);
     drawZones(w, G, T);
     drawObjects(w, G, T, vis);
     drawCars(w, vis);
+    drawGhost(G, T);
     drawTruck(truck, T, active);
     drawCanopies(w, vis, T);
 
@@ -638,14 +700,34 @@ const Render = (() => {
     ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
     drawGlows(w, G, truck, T, vis, active);
     drawParticles(vis);
+    drawReticle(G, T);
     drawPops();
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (G && G.boostVis > 0.01) speedLines(G.boostVis, T);
     screenFX(cam, T, G, state, s);
     if (state === 'play') {
       const tg = target(w, G);
       if (tg) drawMarker(tg, T, s, ox, oy);
     }
+  }
+
+  function speedLines(k, T) {
+    const { w, h } = view, cx = w / 2, cy = h / 2, R = Math.hypot(w, h) / 2;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = 'rgba(242,169,62,' + (0.22 * k) + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 46; i++) {
+      const a = i * 2.39996 + Math.floor(T * 30) * 0.7;
+      const r0 = R * (0.55 + ((i * 37 + Math.floor(T * 40)) % 30) / 100);
+      const r1 = r0 + R * 0.18 * k;
+      ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
 
   // ---------------------------------------------------------- radar
@@ -658,7 +740,7 @@ const Render = (() => {
     g.fillStyle = 'rgba(5,7,10,0.6)'; g.fillRect(0, 0, mc.width, mc.height);
     g.setTransform(k, 0, 0, k, 0, 0);
     for (const b of w.blocks) {
-      g.fillStyle = b.type === 'park' ? '#0F1A17' : b.type === 'station' ? '#3A2218' : b.type === 'incident' ? '#3A1414' : '#1A2029';
+      g.fillStyle = b.type === 'park' ? '#0F1A17' : b.type === 'station' ? '#3A2218' : (b.type === 'incident' || b.burning) ? '#3A1414' : '#1A2029';
       g.fillRect(b.x + 10, b.y + 10, b.w - 20, b.h - 20);
     }
     const dot = (x, y, r, c) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r / k, 0, Math.PI * 2); g.fill(); };
@@ -668,6 +750,7 @@ const Render = (() => {
     const p = 1 + 0.35 * Math.sin(T * 6);
     dot(w.incident.cx, w.incident.cy, 6 * p, 'rgba(220,38,38,0.45)');
     dot(w.incident.cx, w.incident.cy, 3.2, '#DC2626');
+    if (G && G.ghostPos) dot(G.ghostPos.x, G.ghostPos.y, 2.6, 'rgba(143,184,240,0.8)');
     const t = G ? G.truck : w.parked;
     g.save(); g.translate(t.x, t.y); g.rotate(t.a); g.scale(1 / k, 1 / k);
     g.fillStyle = '#F2703C'; g.shadowColor = '#F2703C'; g.shadowBlur = 8;
@@ -675,5 +758,5 @@ const Render = (() => {
     g.restore();
   }
 
-  return { init, frame, minimap, view, target };
+  return { init, frame, minimap, view, target, fireLevel };
 })();

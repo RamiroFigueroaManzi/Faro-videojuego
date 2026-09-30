@@ -1,14 +1,28 @@
 // Utilidades, paleta FARO y glifos de botones PS4.
 
+// Generador con semilla (mulberry32): el mismo mapa para todos los jugadores de una zona.
+let _rng = Math.random;
+
 const U = {
+  seed(s) {
+    let a = s >>> 0;
+    _rng = () => {
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  },
+  unseed() { _rng = Math.random; },
+  r: () => _rng(),
   clamp: (v, a, b) => (v < a ? a : v > b ? b : v),
   lerp: (a, b, t) => a + (b - a) * t,
-  rand: (a, b) => a + Math.random() * (b - a),
-  randi: (a, b) => Math.floor(a + Math.random() * (b - a + 1)),
-  pick: (arr) => arr[Math.floor(Math.random() * arr.length)],
+  rand: (a, b) => a + _rng() * (b - a),
+  randi: (a, b) => Math.floor(a + _rng() * (b - a + 1)),
+  pick: (arr) => arr[Math.floor(_rng() * arr.length)],
   shuffle(a) {
     for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(_rng() * (i + 1));
       [a[i], a[j]] = [a[j], a[i]];
     }
     return a;
