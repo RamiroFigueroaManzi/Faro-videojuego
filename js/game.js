@@ -48,6 +48,7 @@
 
   function startRun() {
     Sfx.init();
+    Sfx.ui();
     world = genWorld();
     FX.clear();
     const s = world.start;
