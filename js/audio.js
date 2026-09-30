@@ -19,6 +19,7 @@ const Sfx = (() => {
       master.gain.value = muted ? 0 : VOL;
       master.connect(comp); comp.connect(ctx.destination);
       startLoops();
+      musicSetup();
     }
     if (ctx.state !== 'running') ctx.resume().then(confirm).catch(() => {});
     else confirm();
@@ -46,13 +47,17 @@ const Sfx = (() => {
     o.start(t); o.stop(t + dur + 0.05);
   }
 
+  function getNoise() {
+    if (noiseBuf) return noiseBuf;
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return noiseBuf;
+  }
+
   function noise(dur, vol = 0.2, freq = 800, delay = 0, type = 'lowpass') {
     if (!ctx) return;
-    if (!noiseBuf) {
-      noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-      const d = noiseBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
+    getNoise();
     const t = ctx.currentTime + delay;
     const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = noiseBuf;
@@ -77,14 +82,139 @@ const Sfx = (() => {
     engine = { o: eo, g: eg, f: ef };
   }
 
+  // ------------------------------------------------------------- música
+  // Secuenciador propio: Re menor, 124 BPM, 4 compases (Dm · B♭ · Gm · A).
+  // Nivel -1 = silencio, 0 = ambiente (título), 1 = partida, 2 = tensión.
+
+  const SD = 60 / 124 / 4;
+  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  const PROG = [
+    { bass: 38, chord: [62, 65, 69] },
+    { bass: 34, chord: [58, 62, 65] },
+    { bass: 31, chord: [55, 58, 62] },
+    { bass: 33, chord: [57, 61, 64] },
+  ];
+  const ARP = [0, 1, 2, 1, 0, 2, 1, 2, 0, 1, 2, 3, 2, 1, 0, 1];
+  const mus = { level: -1, step: 0, next: 0, bus: null, echo: null };
+
+  function musicSetup() {
+    mus.bus = ctx.createGain();
+    mus.bus.gain.value = 0;
+    mus.bus.connect(master);
+    const d = ctx.createDelay(1), fb = ctx.createGain(), lp = ctx.createBiquadFilter();
+    d.delayTime.value = SD * 3; fb.gain.value = 0.35; lp.type = 'lowpass'; lp.frequency.value = 1800;
+    d.connect(lp); lp.connect(fb); fb.connect(d); lp.connect(mus.bus);
+    mus.echo = d;
+  }
+
+  function voice(dest, freq, t, dur, type, vol, att = 0.008, cutoff = 0) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + att);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    let out = o;
+    if (cutoff) {
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass'; f.frequency.value = cutoff;
+      o.connect(f); out = f;
+    }
+    out.connect(g);
+    for (const d of [].concat(dest)) g.connect(d);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  function drum(kind, t) {
+    if (kind === 'kick') {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(140, t);
+      o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+      g.gain.setValueAtTime(0.5, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+      o.connect(g); g.connect(mus.bus);
+      o.start(t); o.stop(t + 0.3);
+      return;
+    }
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = getNoise();
+    const hat = kind === 'hat';
+    f.type = hat ? 'highpass' : 'bandpass';
+    f.frequency.value = hat ? 7000 : 1800;
+    const dur = hat ? 0.05 : 0.16;
+    g.gain.setValueAtTime(hat ? 0.09 : 0.14, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(mus.bus);
+    s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
+  }
+
+  function scheduleStep(step, t) {
+    const lvl = mus.level;
+    const bar = PROG[Math.floor(step / 16) % 4];
+    const s = step % 16;
+
+    if (s === 0) {
+      const dur = SD * 16 + 0.3;
+      for (const m of bar.chord) {
+        voice(mus.bus, mtof(m), t, dur, 'triangle', 0.035, 0.5, 1400);
+        voice(mus.bus, mtof(m) * 1.004, t, dur, 'sawtooth', 0.012, 0.6, 900);
+      }
+      voice(mus.bus, mtof(bar.bass), t, dur, 'sine', lvl >= 1 ? 0.05 : 0.08, 0.4);
+    }
+
+    const arpEvery = lvl >= 2 ? 1 : 2;
+    if (lvl === 0 ? s % 4 === 0 : s % arpEvery === 0) {
+      const tones = bar.chord.concat(bar.chord[0] + 12);
+      const m = tones[ARP[s]] + (lvl >= 2 && s % 4 === 3 ? 12 : 0);
+      voice([mus.bus, mus.echo], mtof(m + 12), t, SD * 1.6, 'triangle', lvl === 0 ? 0.035 : 0.045, 0.005, 3000);
+    }
+
+    if (lvl >= 1) {
+      if (s % 2 === 0) {
+        const m = bar.bass + 12 + (s % 8 === 6 ? 12 : 0);
+        voice(mus.bus, mtof(m), t, SD * 1.8, 'sawtooth', 0.075, 0.005, lvl >= 2 ? 700 : 480);
+      }
+      if (s % 4 === 0) drum('kick', t);
+      if (s % 4 === 2) drum('hat', t);
+      if (lvl >= 2) {
+        if (s % 2 === 1) drum('hat', t);
+        if (s === 4 || s === 12) drum('snare', t);
+      }
+    }
+  }
+
+  function setMusic(level) {
+    if (!ctx || !mus.bus) return;
+    if (level === mus.level) return;
+    const t = ctx.currentTime;
+    if (mus.level < 0 && level >= 0) { mus.step = 0; mus.next = t + 0.05; }
+    mus.level = level;
+    const vol = level < 0 ? 0 : level === 0 ? 1.4 : 1;
+    mus.bus.gain.cancelScheduledValues(t);
+    mus.bus.gain.setTargetAtTime(vol, t, level < 0 ? 0.25 : 0.4);
+  }
+
+  function musicTick() {
+    if (mus.level < 0 || ctx.state !== 'running') return;
+    const now = ctx.currentTime;
+    if (mus.next < now - 0.2) mus.next = now + 0.05;
+    while (mus.next < now + 0.15) {
+      scheduleStep(mus.step, mus.next);
+      mus.next += SD;
+      mus.step = (mus.step + 1) % 64;
+    }
+  }
+
   // Sirena "hi-lo" + motor que sube con la velocidad.
   function update(dt, speedNorm, active) {
     if (!ctx || !siren) return;
+    musicTick();
     const t = ctx.currentTime;
     siren.phase += dt;
     const hi = Math.floor(siren.phase / 0.55) % 2 === 0;
     siren.o.frequency.setTargetAtTime(hi ? 880 : 660, t, 0.015);
-    siren.g.gain.setTargetAtTime(active ? 0.07 : 0, t, 0.15);
+    siren.g.gain.setTargetAtTime(active ? 0.022 : 0, t, 0.15);
     engine.o.frequency.setTargetAtTime(65 + speedNorm * 130, t, 0.05);
     engine.f.frequency.setTargetAtTime(700 + speedNorm * 900, t, 0.05);
     engine.g.gain.setTargetAtTime(active ? 0.06 + speedNorm * 0.08 : 0, t, 0.12);
@@ -97,7 +227,7 @@ const Sfx = (() => {
   }
 
   return {
-    init, update, toggleMute,
+    init, update, toggleMute, setMusic,
     get muted() { return muted; },
     get running() { return !!ctx && ctx.state === 'running'; },
     ui: () => tone(880, 0.07, 'triangle', 0.18),

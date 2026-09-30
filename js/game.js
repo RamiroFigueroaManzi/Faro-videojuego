@@ -544,6 +544,16 @@
     updateCamera(rawDt);
     const sp = G ? Math.min(1, Math.hypot(G.truck.vx, G.truck.vy) / 560) : 0;
     Sfx.update(rawDt, sp, !!G && state !== 'result' && state !== 'title');
+    Sfx.setMusic(musicLevel());
+  }
+
+  // -1 silencio · 0 ambiente · 1 partida · 2 tensión
+  function musicLevel() {
+    if (state === 'title' || state === 'brief') return 0;
+    if (state === 'end') return -1;
+    if (state === 'result') return stateT > 1.2 ? 0 : -1;
+    if (state === 'qte' || G.time < 8) return 2;
+    return 1;
   }
 
   function flashGo() {
