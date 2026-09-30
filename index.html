@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FARO · Respuesta</title>
+  <meta name="description" content="Llevá el camión de bomberos desde la central hasta el incendio en 30 segundos. Jugable con joystick de PS4.">
+  <meta name="theme-color" content="#05070A">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Monoton&family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- HUD en partida -->
+  <div id="hud" class="hidden">
+    <div class="hud-tl glass">
+      <div class="hud-brand">FARO</div>
+      <div class="hud-unit mono">UNIDAD 07 · <span id="hud-speed">0</span> km/h</div>
+    </div>
+
+    <div class="hud-tc">
+      <div class="timer-label">TIEMPO DE RESPUESTA</div>
+      <div id="hud-timer" class="timer">30.0</div>
+      <div id="hud-obj" class="objective"><span class="dot"></span><span id="hud-obj-text"></span></div>
+    </div>
+
+    <div class="hud-tr glass">
+      <div class="panel-title"><span>RADAR</span><span id="hud-dist" class="mono"></span></div>
+      <canvas id="minimap" width="480" height="300"></canvas>
+    </div>
+
+    <div class="hud-bl glass">
+      <div id="hud-tank" class="gauge-row">
+        <span class="label">TANQUE</span>
+        <div class="tank"><div id="hud-tank-fill"></div></div>
+        <span id="hud-tank-pct" class="mono">VACÍO</span>
+      </div>
+      <div class="gauge-row">
+        <span class="label">CIVILES</span>
+        <div id="hud-civ" class="civ"></div>
+        <span class="mono dim">+2s c/u</span>
+      </div>
+    </div>
+
+    <div class="hud-br chip mono" id="hud-device"></div>
+
+    <div id="prompt" class="prompt hidden">
+      <div class="prompt-btn">
+        <svg class="ring" viewBox="0 0 60 60">
+          <circle cx="30" cy="30" r="26" class="ring-bg"/>
+          <circle cx="30" cy="30" r="26" class="ring-fg" id="prompt-ring"/>
+        </svg>
+        <span data-glyph="0"></span>
+      </div>
+      <div>
+        <div id="prompt-text" class="prompt-text">CARGAR AGUA</div>
+        <div id="prompt-key" class="prompt-key mono"></div>
+      </div>
+    </div>
+
+    <div id="qte" class="qte glass hidden">
+      <div class="qte-head"><span class="badge critical">ATAQUE</span><span class="qte-title">SEGUÍ LA SECUENCIA</span></div>
+      <div id="qte-seq" class="qte-seq"></div>
+      <div class="firebar-row"><span class="label">FUEGO</span><div class="firebar"><div id="qte-fire"></div></div></div>
+    </div>
+
+    <div id="go" class="go">¡YA!</div>
+  </div>
+
+  <!-- Pantalla de título -->
+  <div id="screen-title" class="screen">
+    <div class="title-wrap">
+      <div class="logo">
+        <div class="beam"></div>
+        <div class="lamp"></div>
+        <h1 class="wordmark">FARO</h1>
+      </div>
+      <div class="subtitle">RESPUESTA<span class="accent-bar"></span></div>
+      <p class="tagline">30 segundos. Un incendio. Cargá agua, rescatá a quien puedas y llegá antes de que sea tarde.</p>
+      <div class="cta"><span data-glyph="0"></span><span>PRESIONÁ PARA DESPACHAR</span><span class="kb-only mono">(ESPACIO)</span></div>
+
+      <div class="controls glass">
+        <div class="ctl"><span class="k">STICK IZQ.</span><span>Dirigir y acelerar</span></div>
+        <div class="ctl"><span class="k">R2 / L2</span><span>Acelerar / frenar</span></div>
+        <div class="ctl"><span class="k"><span data-glyph="0"></span> machacar</span><span>Cargar agua en el hidrante</span></div>
+        <div class="ctl"><span class="k"><span data-glyph="0"></span><span data-glyph="1"></span><span data-glyph="2"></span><span data-glyph="3"></span></span><span>Secuencia de ataque al fuego</span></div>
+        <div class="ctl kb"><span class="k mono">TECLADO</span><span>Flechas/WASD · Espacio · J K L I · Esc</span></div>
+      </div>
+      <div class="best mono" id="title-best"></div>
+    </div>
+    <div class="title-foot">
+      <div class="chip mono" id="title-device"></div>
+      <div class="chip mono" id="mute">SONIDO: ON (M)</div>
+    </div>
+  </div>
+
+  <!-- Despacho + cuenta regresiva -->
+  <div id="screen-brief" class="screen screen-clear hidden">
+    <div class="brief glass">
+      <div class="brief-top"><span class="badge critical">CRÍTICO</span><span class="mono dim">CANAL 2 · DESPACHO</span></div>
+      <h2 id="brief-type"></h2>
+      <div id="brief-addr" class="brief-addr"></div>
+      <div id="brief-radio" class="radio mono"></div>
+      <ol class="steps">
+        <li><span class="step-dot water"></span>Cargá agua: frená en un <b>hidrante</b> y machacá <span data-glyph="0"></span></li>
+        <li><span class="step-dot civ"></span>Pasá por los <b>civiles</b>: +2 s cada uno</li>
+        <li><span class="step-dot fire"></span>En el incendio, seguí la <b>secuencia</b> de botones</li>
+      </ol>
+    </div>
+    <div id="countdown" class="countdown"></div>
+  </div>
+
+  <!-- Resultado -->
+  <div id="screen-result" class="screen hidden">
+    <div class="result glass">
+      <div class="res-head">
+        <span id="res-badge" class="badge resolved">RESUELTO</span>
+        <h2 id="res-title">INCENDIO CONTROLADO</h2>
+        <div id="res-sub" class="res-sub"></div>
+        <span class="accent-bar"></span>
+      </div>
+      <div class="res-body">
+        <div id="res-rank" class="rank">S</div>
+        <dl class="stats">
+          <div><dt>Tiempo restante</dt><dd id="res-time" class="mono"></dd></div>
+          <div><dt>Civiles rescatados</dt><dd id="res-civ" class="mono"></dd></div>
+          <div><dt>Choques</dt><dd id="res-crash" class="mono"></dd></div>
+          <div><dt>Errores de secuencia</dt><dd id="res-mist" class="mono"></dd></div>
+          <div class="total"><dt>Puntaje</dt><dd id="res-score" class="mono"></dd></div>
+        </dl>
+      </div>
+      <div id="res-best" class="res-best mono"></div>
+      <div class="res-cta">
+        <span class="act"><span data-glyph="0"></span> REINTENTAR <span class="kb-only mono">ESPACIO</span></span>
+        <span class="act dim"><span data-glyph="1"></span> MENÚ <span class="kb-only mono">L</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pausa -->
+  <div id="screen-pause" class="screen hidden">
+    <div class="pause glass">
+      <h2>PAUSA</h2>
+      <div class="res-cta">
+        <span class="act"><span data-glyph="0"></span> CONTINUAR</span>
+        <span class="act dim"><span data-glyph="1"></span> MENÚ</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/util.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
