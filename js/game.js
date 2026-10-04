@@ -844,13 +844,13 @@
       if (Math.random() < 10 * dt * p.hp) {
         FX.emit({ x: p.x + U.rand(-20, 20), y: p.y + U.rand(-20, 20), vx: U.rand(-20, 60), vy: U.rand(-80, -20), life: U.rand(0.8, 1.6), size: U.rand(2, 4), color: '255,170,80', drag: 0.4 });
       }
-      if (Math.random() < 2.6 * dt * p.hp) {
-        FX.emit({ x: p.x, y: p.y, vx: U.rand(20, 70), vy: U.rand(-60, -20), life: U.rand(2.5, 4), size: U.rand(30, 50), grow: 34, add: false, color: '16,18,22', a: 0.55, drag: 0.2 });
+      if (Math.random() < 1.6 * dt * p.hp) {
+        FX.emit({ x: p.x, y: p.y, vx: U.rand(20, 70), vy: U.rand(-60, -20), life: U.rand(2, 3), size: U.rand(26, 40), grow: 24, add: false, color: '16,18,22', a: 0.6, drag: 0.2 });
       }
     }
     for (const f of world.fires) {
       if (Math.random() < 6 * dt) FX.emit({ x: f.x + U.rand(-10, 10), y: f.y, vx: U.rand(-15, 30), vy: U.rand(-60, -20), life: U.rand(0.6, 1.2), size: U.rand(2, 3.5), color: '255,170,80', drag: 0.5 });
-      if (Math.random() < 1.2 * dt) FX.emit({ x: f.x, y: f.y, vx: U.rand(10, 40), vy: U.rand(-40, -10), life: 2.2, size: 18, grow: 22, add: false, color: '18,20,24', a: 0.45, drag: 0.3 });
+      if (Math.random() < 0.8 * dt) FX.emit({ x: f.x, y: f.y, vx: U.rand(10, 40), vy: U.rand(-40, -10), life: 1.8, size: 18, grow: 18, add: false, color: '18,20,24', a: 0.45, drag: 0.3 });
     }
     FX.update(dt);
   }
@@ -1038,7 +1038,7 @@
 
   const hud = {};
   function cacheHud() {
-    ['sound-lock', 'mute', 'hud-timer', 'hud-obj', 'hud-obj-text', 'hud-speed', 'hud-tank-fill', 'hud-tank-pct', 'hud-tank', 'hud-dist', 'prompt', 'prompt-text', 'prompt-key',
+    ['mute', 'hud-timer', 'hud-obj', 'hud-obj-text', 'hud-speed', 'hud-tank-fill', 'hud-tank-pct', 'hud-tank', 'hud-dist', 'prompt', 'prompt-text', 'prompt-key',
       'pgauge', 'pg-zone', 'pg-needle', 'hud-device', 'title-device', 'minimap', 'qte-fire', 'hud-turbo', 'hud-turbo-fill', 'combo', 'combo-n', 'combo-pts', 'combo-t',
       'qte-title', 'qte-seq', 'aim-help', 'title-panels']
       .forEach((id) => { hud[id] = $(id); });
@@ -1099,7 +1099,6 @@
     setText(hud['hud-device'], pad ? `${pad}` : 'TECLADO');
     hud['title-device'].classList.toggle('live', !!pad);
     setText(hud.mute, !Sfx.running ? 'CLIC O TECLA PARA ACTIVAR SONIDO' : Sfx.muted ? 'SONIDO: OFF (M)' : 'SONIDO: ON (M)');
-    hud['sound-lock'].classList.toggle('hidden', Sfx.running);
     if (state === 'title') hud['title-panels'].classList.toggle('alt', Math.floor(T / 7) % 2 === 1);
 
     if (!G) return;
@@ -1157,7 +1156,7 @@
       const tot = fires.reduce((s, p) => s + Math.max(0, p.hp), 0);
       hud['qte-fire'].style.width = Math.round((tot / Math.max(1, fires.length)) * 100) + '%';
     }
-    Render.minimap(hud.minimap, world, G, T);
+    if ((hud.mmFrame = (hud.mmFrame || 0) + 1) % 2 === 0) Render.minimap(hud.minimap, world, G, T);
   }
 
   // --------------------------------------------------------------- loop

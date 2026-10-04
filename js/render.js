@@ -31,6 +31,11 @@ const FX = {
 
 const Render = (() => {
   let cv, ctx, lcv, lctx, vig, fogA, fogB, patA, patB;
+  let acv, actx;                 // atmósfera (niebla + rayos) a media resolución
+  let gcv, gctx, groundKey = ''; // suelo, veredas y techos cacheados en una imagen
+  let fontsReady = false;
+  // Tope de píxeles del canvas del mundo: el HUD es HTML, así que los textos siguen nítidos.
+  const PIXEL_BUDGET = 2.2e6;
   const view = { w: 1, h: 1, dpr: 1, base: 1, s: 1, ox: 0, oy: 0 };
   const sprites = {};
   const motes = [];
@@ -87,10 +92,13 @@ const Render = (() => {
     ctx = cv.getContext('2d');
     lcv = document.createElement('canvas');
     lctx = lcv.getContext('2d');
+    acv = document.createElement('canvas');
+    actx = acv.getContext('2d');
     fogA = makeFog(768, 22, 0.16);
     fogB = makeFog(1024, 16, 0.2);
-    patA = ctx.createPattern(fogA, 'repeat');
-    patB = ctx.createPattern(fogB, 'repeat');
+    patA = actx.createPattern(fogA, 'repeat');
+    patB = actx.createPattern(fogB, 'repeat');
+    if (document.fonts) document.fonts.ready.then(() => { fontsReady = true; });
     for (let i = 0; i < 70; i++) {
       motes.push({ x: Math.random(), y: Math.random(), d: U.rand(0.3, 1.4), r: U.rand(0.8, 2.4), ph: Math.random() * 6.28, vy: U.rand(5, 16) });
     }
@@ -99,12 +107,15 @@ const Render = (() => {
   }
 
   function resize() {
-    view.dpr = Math.min(2, devicePixelRatio || 1);
     view.w = innerWidth; view.h = innerHeight;
+    view.dpr = Math.min(2, devicePixelRatio || 1, Math.sqrt(PIXEL_BUDGET / (view.w * view.h)));
     cv.width = Math.round(view.w * view.dpr);
     cv.height = Math.round(view.h * view.dpr);
     lcv.width = Math.ceil(view.w / 2);
     lcv.height = Math.ceil(view.h / 2);
+    acv.width = Math.ceil(view.w / 2);
+    acv.height = Math.ceil(view.h / 2);
+    groundKey = '';
     view.base = Math.min(view.w / 1500, view.h / 860);
     vig = makeVignette();
   }
@@ -154,7 +165,7 @@ const Render = (() => {
     ctx.restore();
     ctx.globalAlpha = 0.85;
     ctx.font = '600 13px Oswald'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#C8DAFF'; ctx.shadowColor = '#5887FF'; ctx.shadowBlur = 10;
+    ctx.fillStyle = '#C8DAFF';
     ctx.fillText('RÉCORD · ' + (g.name || '???'), 0, -44);
     ctx.restore();
   }
@@ -171,7 +182,6 @@ const Render = (() => {
     }
     const pulse = 1 + Math.sin(T * 8) * 0.06;
     ctx.translate(a.rx, a.ry);
-    ctx.shadowColor = '#5887FF'; ctx.shadowBlur = 14;
     ctx.strokeStyle = a.spraying ? '#DCE6FF' : '#8FB8F0'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(0, 0, 58 * pulse, 0, Math.PI * 2); ctx.stroke();
     ctx.lineWidth = 2.5;
@@ -181,6 +191,29 @@ const Render = (() => {
     }
     ctx.fillStyle = '#DCE6FF'; ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
+  }
+
+  // Dibuja el suelo una vez en una imagen y la reutiliza; se rehace sólo si cambia
+  // el mundo, la escala, la propagación del fuego o la carga de fuentes.
+  function groundLayer(w) {
+    const gs = U.clamp(view.base * view.dpr * 1.15, 0.6, 2);
+    let active = 0;
+    for (const p of w.incident.points) if (p.active) active++;
+    let burning = 0;
+    for (const b of w.blocks) if (b.burning) burning++;
+    const key = [gs.toFixed(2), active, burning, fontsReady].join('|');
+    if (gcv && gcv._world === w && groundKey === key) return gs;
+    if (!gcv) { gcv = document.createElement('canvas'); gctx = gcv.getContext('2d'); }
+    gcv.width = Math.ceil(w.W * gs);
+    gcv.height = Math.ceil(w.H * gs);
+    const saved = ctx;
+    ctx = gctx;
+    ctx.setTransform(gs, 0, 0, gs, 0, 0);
+    drawGround(w, () => true, 0);
+    ctx = saved;
+    gcv._world = w;
+    groundKey = key;
+    return gs;
   }
 
   function drawGround(w, vis, T) {
@@ -631,11 +664,12 @@ const Render = (() => {
       const k = q.life / q.max;
       ctx.globalAlpha = Math.min(1, k * 2);
       ctx.font = `700 ${q.size}px Oswald`;
-      ctx.shadowColor = q.color; ctx.shadowBlur = 16;
+      ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(5,7,10,0.85)';
+      ctx.strokeText(q.text, q.x, q.y);
       ctx.fillStyle = q.color;
       ctx.fillText(q.text, q.x, q.y);
     }
-    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    ctx.globalAlpha = 1;
   }
 
   function target(w, G) {
@@ -656,7 +690,6 @@ const Render = (() => {
     const { w, h } = view, m = 70;
     ctx.save();
     ctx.fillStyle = tg.color; ctx.strokeStyle = tg.color;
-    ctx.shadowColor = tg.color; ctx.shadowBlur = 14;
     ctx.font = '600 13px Oswald'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     if (sx > m && sx < w - m && sy > m && sy < h - m) {
       const by = sy - 70 * s - Math.abs(Math.sin(T * 4)) * 10;
@@ -685,30 +718,35 @@ const Render = (() => {
 
   function screenFX(cam, T, G, state, s) {
     const { w, h } = view;
-    // niebla en capas con parallax
-    ctx.globalCompositeOperation = 'screen';
+    // niebla en capas con parallax + rayos de luz, a media resolución
+    const a2 = actx;
+    a2.setTransform(1, 0, 0, 1, 0, 0);
+    a2.globalAlpha = 1; a2.globalCompositeOperation = 'source-over';
+    a2.clearRect(0, 0, acv.width, acv.height);
+    a2.setTransform(0.5, 0, 0, 0.5, 0, 0);
+    a2.globalCompositeOperation = 'lighter';
     const fog = (pat, size, ox, oy, a) => {
-      ctx.save(); ctx.globalAlpha = a;
+      a2.save(); a2.globalAlpha = a;
       const mx = ((ox % size) + size) % size, my = ((oy % size) + size) % size;
-      ctx.translate(-mx, -my); ctx.fillStyle = pat; ctx.fillRect(0, 0, w + size, h + size);
-      ctx.restore();
+      a2.translate(-mx, -my); a2.fillStyle = pat; a2.fillRect(0, 0, w + size, h + size);
+      a2.restore();
     };
     fog(patA, 768, cam.x * s * 0.8 + T * 14, cam.y * s * 0.8 + T * 4, 0.55);
     fog(patB, 1024, cam.x * s * 1.25 + T * 26, cam.y * s * 1.25 - T * 6, 0.4);
-
-    // rayos de luz diagonales
     for (let k = 0; k < 3; k++) {
       const xb = (k * 0.34 + 0.08) * w + Math.sin(T * 0.23 + k * 2) * 60;
       const a = 0.05 + 0.025 * Math.sin(T * 0.5 + k);
-      const g = ctx.createLinearGradient(0, 0, 0, h);
+      const g = a2.createLinearGradient(0, 0, 0, h);
       g.addColorStop(0, `rgba(210,222,240,${a})`);
       g.addColorStop(1, 'rgba(210,222,240,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.moveTo(xb, -10); ctx.lineTo(xb + 70 + k * 20, -10);
-      ctx.lineTo(xb + 380 + k * 30, h + 10); ctx.lineTo(xb + 220, h + 10);
-      ctx.closePath(); ctx.fill();
+      a2.fillStyle = g;
+      a2.beginPath();
+      a2.moveTo(xb, -10); a2.lineTo(xb + 70 + k * 20, -10);
+      a2.lineTo(xb + 380 + k * 30, h + 10); a2.lineTo(xb + 220, h + 10);
+      a2.closePath(); a2.fill();
     }
+    ctx.globalCompositeOperation = 'screen';
+    ctx.drawImage(acv, 0, 0, w, h);
 
     // motas flotantes
     ctx.globalCompositeOperation = 'lighter';
@@ -755,7 +793,12 @@ const Render = (() => {
     const vis = (x, y, m) => x > x0 - m && x < x1 + m && y > y0 - m && y < y1 + m;
 
     ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
-    drawGround(w, vis, T);
+    const gs = groundLayer(w);
+    const gx0 = U.clamp(x0 - 20, 0, w.W), gy0 = U.clamp(y0 - 20, 0, w.H);
+    const gx1 = U.clamp(x1 + 20, 0, w.W), gy1 = U.clamp(y1 + 20, 0, w.H);
+    if (gx1 > gx0 && gy1 > gy0) {
+      ctx.drawImage(gcv, gx0 * gs, gy0 * gs, (gx1 - gx0) * gs, (gy1 - gy0) * gs, gx0, gy0, gx1 - gx0, gy1 - gy0);
+    }
     drawSkids(w, vis);
     drawZones(w, G, T);
     drawObjects(w, G, T, vis);

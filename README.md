@@ -42,7 +42,7 @@ Los récords y fantasmas se guardan en el navegador de la compu (localStorage). 
 
 Hacé doble clic en **`jugar-stand.bat`**. Abre el juego en Chrome (o Edge) en pantalla completa y con el **sonido habilitado desde el arranque**, sin necesidad de clic: los navegadores bloquean el audio hasta un clic o una tecla, y los botones del joystick no cuentan. Usa un perfil de navegador aparte, así no interfiere con tu Chrome abierto. Para salir: **Alt + F4**.
 
-Si abrís `index.html` directo, aparece abajo el aviso **SIN SONIDO**: hacé un clic o apretá una tecla y se activa.
+Si abrís `index.html` directo, el sonido se activa con el primer clic o tecla.
 
 ## Correr localmente
 
