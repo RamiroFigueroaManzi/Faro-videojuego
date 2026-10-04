@@ -33,6 +33,9 @@
 
   document.querySelectorAll('[data-glyph]').forEach((el) => { el.innerHTML = glyphSVG(+el.dataset.glyph); });
   Input.onUserGesture(() => Sfx.init());
+  // Se crea el audio al cargar: si el navegador lo permite (lanzador del stand) ya suena;
+  // si no, queda suspendido y arranca con el primer clic o tecla.
+  Sfx.init();
 
   // ------------------------------------------------------------ estados
 
@@ -1035,7 +1038,7 @@
 
   const hud = {};
   function cacheHud() {
-    ['mute', 'hud-timer', 'hud-obj', 'hud-obj-text', 'hud-speed', 'hud-tank-fill', 'hud-tank-pct', 'hud-tank', 'hud-dist', 'prompt', 'prompt-text', 'prompt-key',
+    ['sound-lock', 'mute', 'hud-timer', 'hud-obj', 'hud-obj-text', 'hud-speed', 'hud-tank-fill', 'hud-tank-pct', 'hud-tank', 'hud-dist', 'prompt', 'prompt-text', 'prompt-key',
       'pgauge', 'pg-zone', 'pg-needle', 'hud-device', 'title-device', 'minimap', 'qte-fire', 'hud-turbo', 'hud-turbo-fill', 'combo', 'combo-n', 'combo-pts', 'combo-t',
       'qte-title', 'qte-seq', 'aim-help', 'title-panels']
       .forEach((id) => { hud[id] = $(id); });
@@ -1096,6 +1099,7 @@
     setText(hud['hud-device'], pad ? `${pad}` : 'TECLADO');
     hud['title-device'].classList.toggle('live', !!pad);
     setText(hud.mute, !Sfx.running ? 'CLIC O TECLA PARA ACTIVAR SONIDO' : Sfx.muted ? 'SONIDO: OFF (M)' : 'SONIDO: ON (M)');
+    hud['sound-lock'].classList.toggle('hidden', Sfx.running);
     if (state === 'title') hud['title-panels'].classList.toggle('alt', Math.floor(T / 7) % 2 === 1);
 
     if (!G) return;
@@ -1160,12 +1164,15 @@
 
   let last = performance.now();
   function loop(now) {
-    const rawDt = Math.min(0.05, (now - last) / 1000);
+    // El primer timestamp de rAF puede ser anterior al de arranque: nunca dt negativo.
+    const rawDt = U.clamp((now - last) / 1000, 0, 0.05);
     last = now;
     T += rawDt;
     Input.poll(rawDt);
 
     const nav = Input.nav;
+    // Cada botón del joystick reintenta habilitar el audio (algunos navegadores lo aceptan).
+    if (!Sfx.running && Input.anyFace() >= 0) Sfx.init();
     const anyInput = Input.anyFace() >= 0 || nav.x || nav.y || Input.drive().stick > 0.3;
     idleT = anyInput ? 0 : idleT + rawDt;
 
@@ -1182,8 +1189,12 @@
       update(dt, rawDt);
     }
 
-    Render.frame(world, G, cam, T, state === 'attack' ? 'attack' : state);
-    updateHUD();
+    try {
+      Render.frame(world, G, cam, T, state === 'attack' ? 'attack' : state);
+      updateHUD();
+    } catch (e) {
+      if (!loop.warned) { console.error('FARO: error de dibujo', e); loop.warned = true; }
+    }
     Input.endFrame();
     requestAnimationFrame(loop);
   }

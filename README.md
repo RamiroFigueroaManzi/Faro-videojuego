@@ -38,6 +38,12 @@ El puntaje suma el tiempo restante, los civiles, los combos, los PERFECTO, los f
 
 Los récords y fantasmas se guardan en el navegador de la compu (localStorage). Para resetear el ranking del stand: DevTools → Application → Local Storage → borrar las claves `faro-*`.
 
+## Para el stand: `jugar-stand.bat`
+
+Hacé doble clic en **`jugar-stand.bat`**. Abre el juego en Chrome (o Edge) en pantalla completa y con el **sonido habilitado desde el arranque**, sin necesidad de clic: los navegadores bloquean el audio hasta un clic o una tecla, y los botones del joystick no cuentan. Usa un perfil de navegador aparte, así no interfiere con tu Chrome abierto. Para salir: **Alt + F4**.
+
+Si abrís `index.html` directo, aparece abajo el aviso **SIN SONIDO**: hacé un clic o apretá una tecla y se activa.
+
 ## Correr localmente
 
 No tiene dependencias ni build: abrí `index.html` con doble clic, o levantá un servidor estático:

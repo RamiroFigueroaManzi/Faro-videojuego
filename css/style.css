@@ -368,3 +368,12 @@ body.kb .pad-only { display: none; }
 }
 .civ-icon.special svg { stroke: rgba(239, 232, 220, 0.25); stroke-dasharray: 3 2; }
 .civ-icon.special.on svg { stroke: #FFFFFF; stroke-dasharray: none; filter: drop-shadow(0 0 8px #FFFFFF); }
+
+/* Aviso de audio bloqueado (visible en todas las pantallas) */
+.sound-lock {
+  position: fixed; bottom: 4px; left: 50%; transform: translateX(-50%); z-index: 50; white-space: nowrap;
+  padding: 8px 18px; border-radius: 999px; pointer-events: none;
+  background: rgba(245, 158, 11, 0.16); border: 1px solid rgba(245, 158, 11, 0.7);
+  color: #FDE68A; font: 600 14px var(--f-display); letter-spacing: 0.12em;
+  box-shadow: 0 0 30px -6px rgba(245, 158, 11, 0.7); animation: blink 1.2s infinite;
+}

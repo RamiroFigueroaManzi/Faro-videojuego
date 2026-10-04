@@ -367,7 +367,7 @@ const Render = (() => {
       ctx.strokeStyle = '#2A323F'; ctx.lineWidth = 3; ctx.stroke();
       ctx.fillStyle = '#0B1A2A'; ctx.beginPath(); ctx.arc(f.x, f.y, f.r - 9, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = 'rgba(200,212,232,0.18)'; ctx.lineWidth = 1.5;
-      const k = (T * 0.6) % 1;
+      const k = (((T * 0.6) % 1) + 1) % 1;
       ctx.beginPath(); ctx.arc(f.x, f.y, 4 + k * (f.r - 14), 0, Math.PI * 2); ctx.stroke();
     }
     for (const l of w.lamps) {
