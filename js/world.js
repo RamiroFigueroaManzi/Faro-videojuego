@@ -1,6 +1,6 @@
 // Generación procedural de la ciudad y colisiones.
 
-const CFG = { B: 360, R: 180, COLS: 5, ROWS: 3, TIME: 30 };
+const CFG = { B: 360, R: 180, COLS: 5, ROWS: 3, TIME: 40 };
 CFG.CELL = CFG.B + CFG.R;
 CFG.W = CFG.COLS * CFG.CELL + CFG.R;
 CFG.H = CFG.ROWS * CFG.CELL + CFG.R;

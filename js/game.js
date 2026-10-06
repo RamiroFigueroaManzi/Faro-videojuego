@@ -17,8 +17,8 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin storage */ } },
   };
 
-  const boardKey = () => 'faro-v2-board-' + MAP_SEED;
-  const ghostKey = () => 'faro-v2-ghost-' + MAP_SEED;
+  const boardKey = () => 'faro-v3-board-' + MAP_SEED; // v3: partidas de 40 s
+  const ghostKey = () => 'faro-v3-ghost-' + MAP_SEED;
 
   let world = genWorld(MAP_SEED);
   let G = null;
@@ -709,7 +709,7 @@
     G.contain = [400, 200, 0][G.stage];
     if (win) {
       G.score = Math.max(0, Math.round(1000 + timeLeft * 150 + G.rescued * 300 + G.style + (G.mistakes === 0 ? 300 : 0) + G.contain - G.crashes * 100));
-      G.rank = G.score >= 5500 ? 'S' : G.score >= 4200 ? 'A' : G.score >= 3000 ? 'B' : 'C';
+      G.rank = G.score >= 7000 ? 'S' : G.score >= 5700 ? 'A' : G.score >= 4500 ? 'B' : 'C';
     } else {
       G.score = Math.round(G.style + G.rescued * 100);
       G.rank = 'F';

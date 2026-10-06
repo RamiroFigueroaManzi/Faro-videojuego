@@ -1,6 +1,6 @@
 # FARO · Respuesta
 
-Minijuego web de 30 segundos: llevá el camión de bomberos desde la central de FARO hasta el incendio antes de que se propague. Se juega con **joystick de PS4** (DualShock 4) o con teclado y mouse, y está pensado para un stand: partidas cortas, un único mapa fijo, ranking con iniciales sin límite de participantes y fantasma del mejor recorrido.
+Minijuego web de 40 segundos: llevá el camión de bomberos desde la central de FARO hasta el incendio antes de que se propague. Se juega con **joystick de PS4** (DualShock 4) o con teclado y mouse, y está pensado para un stand: partidas cortas, un único mapa fijo, ranking con iniciales sin límite de participantes y fantasma del mejor recorrido.
 
 Estética tomada de la identidad de FARO (paleta nocturna + acento ember, Oswald / JetBrains Mono / Monoton), con atmósfera de niebla, rayos de luz y motas flotantes. La música es atmosférica, estilo Hollow Knight (piano, cuerdas, violonchelo y timbal con reverb, en Re menor), sintetizada en vivo; su pulso se acelera cuando queda poco tiempo o durante el ataque final.
 
