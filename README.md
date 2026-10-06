@@ -23,7 +23,7 @@ El puntaje suma el tiempo restante, los civiles, los combos, los PERFECTO, los f
 
 | Acción | PS4 | Teclado / mouse |
 |---|---|---|
-| Dirigir y acelerar | Stick izquierdo (el camión va hacia donde apuntás) | WASD / flechas |
+| Dirigir y acelerar | Stick izquierdo: el camión va hacia donde apuntás en la pantalla (si apuntás hacia atrás, frena y gira) | WASD / flechas |
 | Acelerar / frenar | R2 / L2 (o D-pad) | ↑ / ↓ |
 | Turbo | R1 | Shift |
 | Hidrante / confirmar | ✕ | Espacio o K |
@@ -35,6 +35,8 @@ El puntaje suma el tiempo restante, los civiles, los combos, los PERFECTO, los f
 | Silenciar | — | M |
 
 > El joystick se detecta con la Gamepad API: conectalo por USB o Bluetooth y **tocá cualquier botón** con la página abierta. Funciona en Chrome, Edge y Firefox. El navegador solo habilita el sonido después de un clic o una tecla.
+
+Si el mando se comporta raro (ejes invertidos, botones cambiados), abrí **`test-joystick.html`**: muestra en vivo qué recibe el navegador y si reconoce el mando con la distribución "standard" que espera el juego.
 
 Los récords y fantasmas se guardan en el navegador de la compu (localStorage). Para resetear el ranking del stand: DevTools → Application → Local Storage → borrar las claves `faro-*`.
 

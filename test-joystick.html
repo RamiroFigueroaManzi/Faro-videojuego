@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FARO · Prueba de joystick</title>
+  <style>
+    :root { --night: #05070A; --panel: #12161D; --line: #232A35; --mist: #F3F5F7; --ash: #97A1AF; --ember: #F2703C; --ok: #16A34A; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--night); color: var(--mist); font: 14px/1.5 ui-monospace, Consolas, monospace; padding: 24px; }
+    h1 { font: 700 22px system-ui, sans-serif; letter-spacing: .08em; margin: 0 0 4px; }
+    .dim { color: var(--ash); }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-top: 16px; max-width: 760px; }
+    .bad { color: #FCA5A5; } .good { color: #86EFAC; }
+    .axis { display: grid; grid-template-columns: 210px 1fr 70px; gap: 10px; align-items: center; margin: 4px 0; }
+    .bar { position: relative; height: 12px; background: var(--line); border-radius: 6px; }
+    .bar i { position: absolute; top: 0; bottom: 0; width: 4px; margin-left: -2px; background: var(--ember); border-radius: 2px; }
+    .bar::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--ash); }
+    .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+    .btn { padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--ash); }
+    .btn.on { background: var(--ember); color: #fff; border-color: var(--ember); }
+    .stick { width: 120px; height: 120px; border: 1px solid var(--line); border-radius: 50%; position: relative; display: inline-block; margin-right: 16px; }
+    .stick b { position: absolute; width: 14px; height: 14px; margin: -7px; border-radius: 50%; background: var(--ember); left: 50%; top: 50%; }
+    .stick span { position: absolute; bottom: -22px; width: 100%; text-align: center; color: var(--ash); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Prueba de joystick</h1>
+  <div class="dim">Conectá el mando y tocá cualquier botón. Mové los sticks: el punto naranja tiene que ir hacia el mismo lado que tu dedo.</div>
+  <div id="out" class="card">Esperando un mando…</div>
+  <script>
+    const NAMES = ['✕', '○', '□', '△', 'L1', 'R1', 'L2', 'R2', 'Share', 'Options', 'L3', 'R3', '↑', '↓', '←', '→', 'PS', 'Touchpad'];
+    const AXES = ['0 · Stick izq. horizontal', '1 · Stick izq. vertical', '2 · Stick der. horizontal', '3 · Stick der. vertical'];
+    const out = document.getElementById('out');
+    function frame() {
+      const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+      if (!pads.length) { out.innerHTML = 'Esperando un mando… (tocá un botón)'; requestAnimationFrame(frame); return; }
+      const g = pads[0];
+      const std = g.mapping === 'standard';
+      let h = `<div><b>${g.id}</b></div>`;
+      h += `<div>Distribución: ${std ? '<span class="good">standard ✔ (la que espera el juego)</span>' : `<span class="bad">"${g.mapping || 'ninguna'}" ✘ — el navegador no la reconoce como estándar</span>`}</div>`;
+      h += `<div class="dim">${g.axes.length} ejes · ${g.buttons.length} botones</div><div style="margin:18px 0 28px">`;
+      const ax = (i) => g.axes[i] || 0;
+      h += `<div class="stick"><b style="left:${50 + ax(0) * 45}%;top:${50 + ax(1) * 45}%"></b><span>izquierdo (ejes 0,1)</span></div>`;
+      h += `<div class="stick"><b style="left:${50 + ax(2) * 45}%;top:${50 + ax(3) * 45}%"></b><span>derecho (ejes 2,3)</span></div></div>`;
+      g.axes.forEach((v, i) => {
+        h += `<div class="axis"><span>${AXES[i] || 'eje ' + i}</span><div class="bar"><i style="left:${(v + 1) * 50}%"></i></div><span>${v.toFixed(2)}</span></div>`;
+      });
+      h += '<div class="btns" style="margin-top:12px">';
+      g.buttons.forEach((b, i) => {
+        const label = std ? (NAMES[i] || i) : i;
+        h += `<span class="btn ${b.pressed ? 'on' : ''}">${i}: ${label}${b.value > 0 && b.value < 1 ? ' ' + b.value.toFixed(2) : ''}</span>`;
+      });
+      h += '</div>';
+      out.innerHTML = h;
+      requestAnimationFrame(frame);
+    }
+    frame();
+  </script>
+</body>
+</html>

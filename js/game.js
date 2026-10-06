@@ -111,23 +111,27 @@
     const fx = Math.cos(t.a), fy = Math.sin(t.a);
     let vf = t.vx * fx + t.vy * fy;
     let vl = -t.vx * fy + t.vy * fx;
-    let throttle = 0, brake = 0;
+    let throttle = 0, brake = 0, stickBrake = 0;
 
     if (!t.locked) {
       if (inp.stick > 0.05) {
-        // El camión gira hacia donde apunta el stick y acelera según cuánto lo empujes.
+        // El camión va hacia donde apunta el stick en la pantalla: gira rápido hacia esa
+        // dirección y, si apuntás muy al revés de donde mira, frena mientras gira en vez
+        // de seguir avanzando para el otro lado.
         const desired = Math.atan2(inp.sy, inp.sx);
         const diff = U.angDiff(t.a, desired);
-        const rate = 3.8 * U.clamp(Math.abs(vf) / 170, 0.5, 1);
+        const rate = U.lerp(8, 4.6, U.clamp(Math.abs(vf) / SPEED, 0, 1));
         t.a += U.clamp(diff, -rate * dt, rate * dt);
-        throttle = inp.stick * (Math.abs(diff) > 2.2 ? 0.35 : 1);
+        const align = Math.cos(diff);
+        if (align > 0) throttle = inp.stick * (0.3 + 0.7 * align);
+        else stickBrake = Math.min(1, -align + 0.3) * inp.stick;
       }
       if (inp.turn) {
         const rate = 3.3 * U.clamp(Math.abs(vf) / 160, 0.35, 1);
         t.a += inp.turn * rate * dt * (vf < -5 ? -1 : 1);
       }
       throttle = Math.max(throttle, inp.thr);
-      brake = inp.brk;
+      brake = Math.max(inp.brk, stickBrake);
     } else {
       brake = 1;
     }
@@ -151,7 +155,8 @@
     if (brake > 0) {
       if (t.locked) vf *= Math.exp(-7 * dt);
       else if (vf > 10) vf -= 1500 * brake * dt;
-      else vf = Math.max(vf - 520 * brake * dt, -210);
+      else if (inp.brk > 0) vf = Math.max(vf - 520 * inp.brk * dt, -210); // marcha atrás sólo con L2 / ↓
+      else vf *= Math.exp(-8 * dt);
     }
     vf *= Math.exp(-(throttle > 0 ? 0.5 : 1.5) * dt);
     const vmax = G.boosting ? SPEED_BOOST : SPEED;
@@ -1209,6 +1214,7 @@
   // ?debug=play | hydrant | attack | aim | lose → atajos para probar escenas
   const dbg = new URLSearchParams(location.search).get('debug');
   if (dbg) {
+    window.__faro = { get G() { return G; } }; // sólo en modo debug, para pruebas automáticas
     startRun();
     stateT = 10;
     const t = G.truck;
